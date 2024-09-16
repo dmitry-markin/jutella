@@ -1,0 +1,10 @@
+[package]
+name = "unspoken"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.89"
+colored = "2.1.0"
+openai_api_rust = "0.1.9"
+thiserror = "1.0.63"
