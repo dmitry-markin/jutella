@@ -15,9 +15,15 @@ fn main() -> anyhow::Result<()> {
     io::stdout().flush()?;
 
     for line in std::io::stdin().lines() {
-        let response = chat.ask(line?)?;
-
-        print!("\n{} {response}\n\n{} ", assistant, you);
+        match chat.ask(line?) {
+            Ok(response) => {
+                print!("\n{} {response}\n\n{} ", assistant, you);
+            }
+            Err(e) => {
+                eprintln!("{} {}", "Error:".yellow(), e.to_string().yellow());
+                print!("{} ", you);
+            }
+        }
         io::stdout().flush()?;
     }
 
