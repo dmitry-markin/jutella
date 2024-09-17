@@ -3,24 +3,24 @@ use openai_api_rust::apis::{Message, Role};
 /// Chat context.
 #[derive(Debug, Default, Clone)]
 pub struct Context {
-    system: Option<String>,
+    system_message: Option<String>,
     conversation: Vec<(String, String)>,
 }
 
 impl Context {
-    pub fn new(system: Option<String>) -> Self {
+    pub fn new(system_message: Option<String>) -> Self {
         Self {
-            system,
+            system_message,
             conversation: Vec::new(),
         }
     }
 
     pub fn with_request(&self, request: String) -> Vec<Message> {
-        self.system
+        self.system_message
             .iter()
-            .map(|system| Message {
+            .map(|system_message| Message {
                 role: Role::System,
-                content: system.clone(),
+                content: system_message.clone(),
             })
             .chain(
                 self.conversation

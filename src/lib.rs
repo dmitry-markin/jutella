@@ -10,7 +10,7 @@ use context::Context;
 pub struct ChatClientConfig {
     pub api_url: String,
     pub model: String,
-    pub system: Option<String>,
+    pub system_message: Option<String>,
 }
 
 impl Default for ChatClientConfig {
@@ -18,7 +18,7 @@ impl Default for ChatClientConfig {
         Self {
             api_url: String::from("https://models.inference.ai.azure.com/"),
             model: String::from("gpt-4o"),
-            system: None,
+            system_message: None,
         }
     }
 }
@@ -55,7 +55,7 @@ impl ChatClient {
         let ChatClientConfig {
             api_url,
             model,
-            system,
+            system_message,
         } = config;
 
         let api_url = if api_url.ends_with('/') {
@@ -67,7 +67,7 @@ impl ChatClient {
         Self {
             openai: OpenAI::new(Auth::new(&auth_token), &api_url),
             model,
-            context: Context::new(system),
+            context: Context::new(system_message),
         }
     }
 
