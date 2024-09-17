@@ -8,9 +8,9 @@ use context::Context;
 
 #[derive(Debug)]
 pub struct ChatClientConfig {
-    api_url: String,
-    model: String,
-    system: Option<String>,
+    pub api_url: String,
+    pub model: String,
+    pub system: Option<String>,
 }
 
 impl Default for ChatClientConfig {
