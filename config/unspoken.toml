@@ -1,4 +1,11 @@
+# API auth token.
 api_key = "<API key>"
+
+# API endpoint.
 url = "https://models.inference.ai.azure.com/"
+
+# Model to use.
 model = "gpt-4o"
+
+# Optional system message to initialize the model.
 system_message = "You are a helpful assistant."
