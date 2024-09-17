@@ -9,4 +9,6 @@ clap = { version = "4.5.17", features = ["derive"] }
 colored = "2.1.0"
 dirs = "5.0.1"
 openai_api_rust = "0.1.9"
+serde = { version = "1.0.210", features = ["derive"] }
 thiserror = "1.0.63"
+toml = "0.8.19"

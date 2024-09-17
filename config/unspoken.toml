@@ -1,0 +1,4 @@
+api_key = "<API key>"
+url = "https://models.inference.ai.azure.com/"
+model = "gpt-4o"
+system_message = "You are a helpful assistant."
