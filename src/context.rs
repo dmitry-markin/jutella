@@ -48,24 +48,19 @@ impl Context {
                 role: Role::System,
                 content: system_message.clone(),
             })
-            .chain(
-                self.conversation
-                    .iter()
-                    .map(|(request, response)| {
-                        [
-                            Message {
-                                role: Role::User,
-                                content: request.clone(),
-                            },
-                            Message {
-                                role: Role::Assistant,
-                                content: response.clone(),
-                            },
-                        ]
-                        .into_iter()
-                    })
-                    .flatten(),
-            )
+            .chain(self.conversation.iter().flat_map(|(request, response)| {
+                [
+                    Message {
+                        role: Role::User,
+                        content: request.clone(),
+                    },
+                    Message {
+                        role: Role::Assistant,
+                        content: response.clone(),
+                    },
+                ]
+                .into_iter()
+            }))
             .chain(std::iter::once(Message {
                 role: Role::User,
                 content: request,

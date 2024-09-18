@@ -33,11 +33,10 @@ use std::{
 };
 use unspoken::{ChatClient, ChatClientConfig};
 
-/// OpenAI chat API command line client.
-///
-/// Command line options override config file.
 #[derive(Debug, clap::Parser)]
-#[command(version, about, long_about = None)]
+#[command(version, about = "OpenAI chat API CLI", long_about = None)]
+#[command(after_help = "You can only set `api_key` in config. \
+                        Command line options override the ones from config.")]
 struct Args {
     /// API url. Example: "https://models.inference.ai.azure.com/".
     #[arg(short, long)]
@@ -51,7 +50,7 @@ struct Args {
     #[arg(short, long)]
     system: Option<String>,
 
-    /// Config file location. Default: $HOME/.config/unspoken.toml.
+    /// Config file location. Default: "$HOME/.config/unspoken.toml".
     #[arg(short, long)]
     config: Option<PathBuf>,
 }
@@ -119,21 +118,23 @@ impl AppConfiguration {
         let api_key = env::var("OPENAI_API_KEY").or_else(|_| {
             config
                 .as_ref()
-                .map(|c| c.api_key.clone())
-                .flatten()
-                .ok_or(anyhow!("Set `api_key` in config or `OPENAI_API_KEY` env."))
+                .and_then(|c| c.api_key.clone())
+                .ok_or(anyhow!(
+                    "Set `api_key` in config. You can also set `OPENAI_API_KEY` env \
+                     if you know what you are doing."
+                ))
         })?;
 
         let api_url = url
-            .or_else(|| config.as_ref().map(|c| c.url.clone()).flatten())
+            .or_else(|| config.as_ref().and_then(|c| c.url.clone()))
             .unwrap_or_else(|| String::from("https://models.inference.ai.azure.com/"));
 
         let model = model
-            .or_else(|| config.as_ref().map(|c| c.model.clone()).flatten())
+            .or_else(|| config.as_ref().and_then(|c| c.model.clone()))
             .unwrap_or_else(|| String::from("gpt-4o"));
 
         let system_message =
-            system.or_else(|| config.as_ref().map(|c| c.system_message.clone()).flatten());
+            system.or_else(|| config.as_ref().and_then(|c| c.system_message.clone()));
 
         Ok(Self {
             api_key,
@@ -180,7 +181,7 @@ fn main() -> anyhow::Result<()> {
         io::stdout().flush()?;
     }
 
-    println!("");
+    println!();
 
     Ok(())
 }
