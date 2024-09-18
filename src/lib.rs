@@ -1,3 +1,29 @@
+// Copyright (c) 2024 `unspoken` chatbot API client developers
+//
+// SPDX-License-Identifier: MIT
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+//! Chatbot API client library.
+
+#![warn(missing_docs)]
+
 use openai_api_rust::{
     chat::{ChatApi, ChatBody},
     Auth, OpenAI,
@@ -6,10 +32,14 @@ use openai_api_rust::{
 mod context;
 use context::Context;
 
+/// Configuration for [`ChatClient`].
 #[derive(Debug)]
 pub struct ChatClientConfig {
+    /// API endpoint.
     pub api_url: String,
+    /// Model.
     pub model: String,
+    /// System message to initialize the model.
     pub system_message: Option<String>,
 }
 
@@ -23,12 +53,16 @@ impl Default for ChatClientConfig {
     }
 }
 
+/// Errors during interaction with a chatbot.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Error reported by the model API.
     #[error("API error: {0}")]
     ApiError(String),
+    /// Web request error.
     #[error("Request error: {0}")]
     RequestError(String),
+    /// Unexpected/missing data in the response.
     #[error("Invalid response: {0}")]
     InvalidResponse(String),
 }
@@ -42,7 +76,7 @@ impl From<openai_api_rust::Error> for Error {
     }
 }
 
-/// OpenAI chat API client.
+/// Chatbot API client.
 pub struct ChatClient {
     openai: OpenAI,
     model: String,
@@ -50,7 +84,7 @@ pub struct ChatClient {
 }
 
 impl ChatClient {
-    /// Create new `ChatClient` accessinf API at `api_url` with `auth_token`.
+    /// Create new [`ChatClient`] accessing API with `auth_token`.
     pub fn new(auth_token: String, config: ChatClientConfig) -> Self {
         let ChatClientConfig {
             api_url,
@@ -71,7 +105,7 @@ impl ChatClient {
         }
     }
 
-    /// Send a `request` and receive a respone.
+    /// Send a `request` and get a respone.
     pub fn ask(&mut self, request: String) -> Result<String, Error> {
         let response = self.openai.chat_completion_create(&Self::body(
             self.model.clone(),
@@ -96,6 +130,7 @@ impl ChatClient {
         Ok(answer)
     }
 
+    /// Construct request body.
     fn body(model: String, context: &Context, request: String) -> ChatBody {
         ChatBody {
             model,
