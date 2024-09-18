@@ -1,6 +1,6 @@
 [package]
 name = "unspoken"
-description = "OpenAI chat API client library and CLI interface."
+description = "Chatbot API client library and CLI interface."
 license = "MIT"
 repository = "https://github.com/dmitry-markin/unspoken"
 version = "0.1.0"
