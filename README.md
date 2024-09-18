@@ -4,6 +4,9 @@
 
 Chatbot API client library and CLI interface. Currently supports OpenAI chat API.
 
+
+## Command line interface
+
 To get started with CLI, put your API key and endpoint into `~/.config/unspoken.toml`. See a config [example](https://github.com/dmitry-markin/unspoken/blob/master/config/unspoken.toml).
 
 ![Screenshot](doc/screenshot.png)
