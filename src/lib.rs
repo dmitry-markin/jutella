@@ -35,7 +35,7 @@ use context::Context;
 /// Configuration for [`ChatClient`].
 #[derive(Debug)]
 pub struct ChatClientConfig {
-    /// API endpoint.
+    /// OpenAI chat API endpoint.
     pub api_url: String,
     /// Model.
     pub model: String,
@@ -84,7 +84,7 @@ pub struct ChatClient {
 }
 
 impl ChatClient {
-    /// Create new [`ChatClient`] accessing API with `auth_token`.
+    /// Create new [`ChatClient`] accessing OpenAI chat API with `auth_token`.
     pub fn new(auth_token: String, config: ChatClientConfig) -> Self {
         let ChatClientConfig {
             api_url,
@@ -105,7 +105,7 @@ impl ChatClient {
         }
     }
 
-    /// Send a `request` and get a respone.
+    /// Ask a new question, extending the chat context after a successful respone.
     pub fn ask(&mut self, request: String) -> Result<String, Error> {
         let response = self.openai.chat_completion_create(&Self::body(
             self.model.clone(),
@@ -130,7 +130,7 @@ impl ChatClient {
         Ok(answer)
     }
 
-    /// Construct request body.
+    /// Construct a request body.
     fn body(model: String, context: &Context, request: String) -> ChatBody {
         ChatBody {
             model,

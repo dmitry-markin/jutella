@@ -47,7 +47,7 @@ struct Args {
     #[arg(short, long)]
     model: Option<String>,
 
-    /// System message to initialize the model. Example: "You are a helpful assistant."
+    /// Optional system message to initialize the model. Example: "You are a helpful assistant."
     #[arg(short, long)]
     system: Option<String>,
 

@@ -32,7 +32,7 @@ pub struct Context {
 }
 
 impl Context {
-    /// Create new chat context.
+    /// Create a new chat context.
     pub fn new(system_message: Option<String>) -> Self {
         Self {
             system_message,
