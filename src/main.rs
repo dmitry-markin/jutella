@@ -43,7 +43,7 @@ struct Args {
     #[arg(short, long)]
     url: Option<String>,
 
-    /// Model. Default: "gpt-4o".
+    /// Model. Default: "gpt-4o-mini".
     #[arg(short, long)]
     model: Option<String>,
 
@@ -132,7 +132,7 @@ impl AppConfiguration {
 
         let model = model
             .or_else(|| config.as_ref().and_then(|c| c.model.clone()))
-            .unwrap_or_else(|| String::from("gpt-4o"));
+            .unwrap_or_else(|| String::from("gpt-4o-mini"));
 
         let system_message =
             system.or_else(|| config.as_ref().and_then(|c| c.system_message.clone()));

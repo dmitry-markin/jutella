@@ -5,7 +5,7 @@ api_key = "<API key>"
 url = "https://models.inference.ai.azure.com/"
 
 # Model to use.
-model = "gpt-4o"
+model = "gpt-4o-mini"
 
 # Optional system message to initialize the model.
 system_message = "You are a helpful assistant."

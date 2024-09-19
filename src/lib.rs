@@ -47,7 +47,7 @@ impl Default for ChatClientConfig {
     fn default() -> Self {
         Self {
             api_url: String::from("https://models.inference.ai.azure.com/"),
-            model: String::from("gpt-4o"),
+            model: String::from("gpt-4o-mini"),
             system_message: None,
         }
     }
