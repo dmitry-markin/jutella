@@ -3,7 +3,7 @@ name = "jutella"
 description = "Chatbot API client library and CLI interface."
 license = "MIT"
 repository = "https://github.com/dmitry-markin/jutella"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
