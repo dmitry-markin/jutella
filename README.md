@@ -20,7 +20,7 @@ To use the chat API, initialize `ChatClient` with `api_key` and `ChatClientConfi
 let mut chat = ChatClient::new(api_key, ChatClientConfig::default());
 ```
 
-Request answers via `ChatClient::ask()`:
+Request replies via `ChatClient::ask()`:
 
 ```rust
 let answer = chat.ask("What is the highest point on Earth?".to_string())?;
