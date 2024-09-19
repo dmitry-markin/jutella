@@ -1,4 +1,4 @@
-// Copyright (c) 2024 `unspoken` chatbot API client developers
+// Copyright (c) 2024 `jutella` chatbot API client developers
 //
 // SPDX-License-Identifier: MIT
 //

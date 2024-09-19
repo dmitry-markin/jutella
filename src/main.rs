@@ -1,4 +1,4 @@
-// Copyright (c) 2024 `unspoken` chatbot API client developers
+// Copyright (c) 2024 `jutella` chatbot API client developers
 //
 // SPDX-License-Identifier: MIT
 //
@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! CLI interface for `unspoken`.
+//! CLI interface for `jutella`.
 
 use anyhow::{anyhow, Context as _};
 use clap::Parser;
@@ -31,7 +31,7 @@ use std::{
     io::{self, Write as _},
     path::PathBuf,
 };
-use unspoken::{ChatClient, ChatClientConfig};
+use jutella::{ChatClient, ChatClientConfig};
 
 #[derive(Debug, Parser)]
 #[command(version)]
@@ -51,7 +51,7 @@ struct Args {
     #[arg(short, long)]
     system: Option<String>,
 
-    /// Config file location. Default: "$HOME/.config/unspoken.toml".
+    /// Config file location. Default: "$HOME/.config/jutella.toml".
     #[arg(short, long)]
     config: Option<PathBuf>,
 }
@@ -95,7 +95,7 @@ impl AppConfiguration {
             )
         } else {
             // If there is $HOME, try reading config from standard path.
-            if let Some(config_path) = home_dir().map(|home| home.join(".config/unspoken.toml")) {
+            if let Some(config_path) = home_dir().map(|home| home.join(".config/jutella.toml")) {
                 match fs::read_to_string(config_path.clone()) {
                     Ok(string) => Ok(toml::from_str(&string).with_context(|| {
                         anyhow!(
