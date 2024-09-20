@@ -7,11 +7,15 @@ version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.89"
-clap = { version = "4.5.17", features = ["derive", "wrap_help"] }
-colored = "2.1.0"
-dirs = "5.0.1"
+anyhow = { version = "1.0.89", optional = true }
+clap = { version = "4.5.17", features = ["derive", "wrap_help"], optional = true }
+colored = { version = "2.1.0", optional = true }
+dirs = { version = "5.0.1", optional = true }
 openai_api_rust = "0.1.9"
-serde = { version = "1.0.210", features = ["derive"] }
+serde = { version = "1.0.210", features = ["derive"], optional = true }
 thiserror = "1.0.63"
-toml = "0.8.19"
+toml = { version = "0.8.19", optional = true }
+
+[features]
+default = ["bin"]
+bin = ["dep:anyhow", "dep:clap", "dep:colored", "dep:dirs", "dep:serde", "dep:toml"]
