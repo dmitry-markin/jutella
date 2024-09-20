@@ -25,11 +25,11 @@
 mod app_config;
 use app_config::{Args, Configuration};
 
-use anyhow::Context as _;
+use anyhow::{anyhow, Context as _};
 use colored::Colorize as _;
 use jutella::{ChatClient, ChatClientConfig};
 use std::{
-    io::{self, Write as _},
+    io::{self, Read as _, Write as _},
     process::{Command, Stdio},
 };
 
@@ -51,9 +51,9 @@ fn main() -> anyhow::Result<()> {
         },
     );
 
-    for line in io::stdin().lines() {
-        print_prompt()?;
+    print_prompt()?;
 
+    for line in io::stdin().lines() {
         if let Ok(response) = chat.ask(line?).inspect_err(|e| print_error(e)) {
             print_response(&response);
 
@@ -63,6 +63,8 @@ fn main() -> anyhow::Result<()> {
                     .unwrap_or_default();
             }
         }
+
+        print_prompt()?;
     }
 
     println!();
@@ -89,7 +91,7 @@ fn copy_to_clipboard(string: String) -> anyhow::Result<()> {
         .arg("clipboard")
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .context("Failed to spawn `xclip`")?;
 
@@ -98,7 +100,21 @@ fn copy_to_clipboard(string: String) -> anyhow::Result<()> {
         .write_all(string.as_ref())
         .context("Failed to pass response via `xclip` stdin")?;
     drop(stdin);
-    xclip.wait().context("`xclip` returned an error")?;
 
-    Ok(())
+    xclip
+        .wait()
+        .context("Failed to wait for `xclip`")?
+        .success()
+        .then_some(())
+        .ok_or(())
+        .or_else(|()| {
+            let mut error = String::new();
+            xclip
+                .stderr
+                .take()
+                .context(anyhow!("Failed to open `xclip` stderr"))?
+                .read_to_string(&mut error)?;
+
+            Err(anyhow!("`xclip` returned an error: {}", error.trim()))
+        })
 }
