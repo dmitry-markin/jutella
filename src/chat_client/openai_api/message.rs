@@ -25,20 +25,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 
-/// The role of the message author.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Role {
-    /// System message.
-    System,
-    /// User message.
-    User,
-    /// Assistant message.
-    Assistant,
-    /// Tool message.
-    Tool,
-}
-
 /// Conversation message.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
@@ -146,6 +132,20 @@ impl From<ToolMessage> for Message {
     fn from(message: ToolMessage) -> Self {
         Self::Tool(message)
     }
+}
+
+/// The role of the message author.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    /// System message.
+    System,
+    /// User message.
+    User,
+    /// Assistant message.
+    Assistant,
+    /// Tool message.
+    Tool,
 }
 
 /// Generic message.
@@ -263,10 +263,10 @@ impl TryFrom<GenericMessage> for Message {
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Missing mandatory field
-    #[error("missing mandatory field `{0}`")]
+    #[error("Missing mandatory field `{0}`")]
     MissingField(&'static str),
     /// Invalid role
-    #[error("expected role {0:?}, got {1:?}")]
+    #[error("Expected role {0:?}, got {1:?}")]
     RoleMismatch(Role, Role),
 }
 

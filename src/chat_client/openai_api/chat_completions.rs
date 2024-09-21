@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! OpenAI API Chat Completions request body.
+//! OpenAI API Chat Completions request & response types.
 
 use crate::chat_client::openai_api::message::GenericMessage;
 use serde::{Deserialize, Serialize};
@@ -225,7 +225,6 @@ pub struct ChatCompletionsBody {
     pub user: Option<String>,
 }
 
-// TODO: introduce proxy type for server error responses.
 /// OpenAI API Chat Completions response.
 ///
 /// Represents a chat completion response returned by model, based on the provided input.

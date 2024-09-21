@@ -25,4 +25,3 @@
 pub mod client;
 mod context;
 mod openai_api;
-mod rest;

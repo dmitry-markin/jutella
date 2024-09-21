@@ -131,7 +131,7 @@ pub struct ErrorBody {
     error: OpenAiError,
 }
 
-/// Possible `error`` field (other fields omitted).
+/// Possible `error` field (fields other than `message` omitted).
 #[derive(Debug, Deserialize)]
 pub struct OpenAiError {
     message: String,
