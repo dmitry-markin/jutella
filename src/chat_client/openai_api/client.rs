@@ -40,6 +40,7 @@ pub struct OpenAiClient {
 }
 
 impl OpenAiClient {
+    /// Create new OpenAI API client.
     pub fn new(api_key: String, base_url: String) -> Result<Self, Error> {
         let client = ClientBuilder::new()
             .default_headers(
@@ -56,6 +57,14 @@ impl OpenAiClient {
         Ok(Self { client, base_url })
     }
 
+    /// Create new OpenAI API client with custom [`reqwest::Client`].
+    ///
+    /// You are responsible for configuring `Authorization:` header!
+    pub fn new_with_client(client: Client, base_url: String) -> Self {
+        Self { client, base_url }
+    }
+
+    /// Request chat completion message.
     pub async fn chat_completions(
         &mut self,
         body: ChatCompletionsBody,
@@ -115,7 +124,9 @@ impl From<reqwest::Error> for Error {
 /// Error in case of HTTP status != 200 OK.
 #[derive(Debug, thiserror::Error)]
 pub struct ApiError {
+    /// HTTP status code.
     pub status: StatusCode,
+    /// Error description.
     pub description: String,
 }
 
@@ -128,11 +139,13 @@ impl Display for ApiError {
 /// Possible error body (might be incomplete type).
 #[derive(Debug, Deserialize)]
 pub struct ErrorBody {
+    /// Internal `error` JSON object.
     error: OpenAiError,
 }
 
 /// Possible `error` field (fields other than `message` omitted).
 #[derive(Debug, Deserialize)]
 pub struct OpenAiError {
+    /// Field `message` of `error` JSON object.
     message: String,
 }

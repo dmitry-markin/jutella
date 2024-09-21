@@ -91,17 +91,32 @@ impl ChatClient {
             system_message,
         } = config;
 
-        let api_url = if api_url.ends_with('/') {
-            api_url
-        } else {
-            api_url + "/"
-        };
+        let api_url = ensure_trailing_slash(api_url);
 
         Ok(Self {
             client: OpenAiClient::new(api_key, api_url)?,
             model,
             context: Context::new(system_message),
         })
+    }
+
+    /// Cretae new [`ChatClient`] accessing OpenAI chat API with preconfigured [`reqwest::Client`].
+    ///
+    /// Make sure to setup `Authorization:` header to `Bearer <api_key>"`.
+    pub fn new_with_client(client: reqwest::Client, config: ChatClientConfig) -> Self {
+        let ChatClientConfig {
+            api_url,
+            model,
+            system_message,
+        } = config;
+
+        let api_url = ensure_trailing_slash(api_url);
+
+        Self {
+            client: OpenAiClient::new_with_client(client, api_url),
+            model,
+            context: Context::new(system_message),
+        }
     }
 
     /// Ask a new question, extending the chat context after a successful respone.
@@ -135,5 +150,13 @@ impl ChatClient {
             messages: context.with_request(request).map(Into::into).collect(),
             ..Default::default()
         }
+    }
+}
+
+fn ensure_trailing_slash(url: String) -> String {
+    if url.ends_with('/') {
+        url
+    } else {
+        url + "/"
     }
 }
