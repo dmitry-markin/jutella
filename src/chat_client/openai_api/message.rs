@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! OpenAI REST API Message types.
+//! OpenAI API Message types.
 
 use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
