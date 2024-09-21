@@ -25,17 +25,16 @@
 use crate::chat_client::openai_api::chat_completions::{ChatCompletions, ChatCompletionsBody};
 use reqwest::{
     header::{HeaderValue, InvalidHeaderValue, AUTHORIZATION},
-    Client, ClientBuilder,
+    Client, ClientBuilder, StatusCode,
 };
 use std::time::Duration;
 
-const CHAT_COMPLETIONS_ENDPOINT: &str = "v1/chat/completions";
+const CHAT_COMPLETIONS_ENDPOINT: &str = "chat/completions";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// OpenAI REST API client.
 pub struct OpenAiClient {
     client: Client,
-    api_key: String,
     base_url: String,
 }
 
@@ -53,24 +52,25 @@ impl OpenAiClient {
             .timeout(REQUEST_TIMEOUT)
             .build()?;
 
-        Ok(Self {
-            client,
-            api_key,
-            base_url,
-        })
+        Ok(Self { client, base_url })
     }
 
     pub async fn chat_completions(
         &mut self,
         body: ChatCompletionsBody,
     ) -> Result<ChatCompletions, Error> {
-        Ok(self.client
+        let response = self
+            .client
             .post(self.base_url.clone() + CHAT_COMPLETIONS_ENDPOINT)
             .json(&body)
             .send()
-            .await?
-            .json()
-            .await?)
+            .await?;
+
+        if response.status().is_success() {
+            Ok(response.json().await?)
+        } else {
+            Err(Error::Http(response.status()))
+        }
     }
 }
 
@@ -83,5 +83,16 @@ pub enum Error {
 
     /// Reqwest error.
     #[error("Request error: {0}")]
-    RequestError(#[from] reqwest::Error),
+    Request(reqwest::Error),
+
+    /// HTTP error.
+    #[error("HTTP error: {0}")]
+    Http(StatusCode),
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(error: reqwest::Error) -> Self {
+        // Remove potentially sensitive information.
+        Self::Request(error.without_url())
+    }
 }

@@ -22,6 +22,6 @@
 
 //! OpenAI REST API.
 
-mod chat_completions;
-mod client;
-mod message;
+pub mod chat_completions;
+pub mod client;
+pub mod message;

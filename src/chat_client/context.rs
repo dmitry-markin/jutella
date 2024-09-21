@@ -22,7 +22,9 @@
 
 //! Chatbot context.
 
-use openai_api_rust::apis::{Message, Role};
+use crate::chat_client::openai_api::message::{
+    AssistantMessage, Message, SystemMessage, UserMessage,
+};
 
 /// Chatbot context.
 #[derive(Debug, Default, Clone)]
@@ -41,31 +43,18 @@ impl Context {
     }
 
     /// Context so far with a new request message.
-    pub fn with_request(&self, request: String) -> Vec<Message> {
+    pub fn with_request(&self, request: String) -> impl Iterator<Item = Message> + '_ {
         self.system_message
             .iter()
-            .map(|system_message| Message {
-                role: Role::System,
-                content: system_message.clone(),
-            })
+            .map(|system_message| SystemMessage::new(system_message.clone()).into())
             .chain(self.conversation.iter().flat_map(|(request, response)| {
                 [
-                    Message {
-                        role: Role::User,
-                        content: request.clone(),
-                    },
-                    Message {
-                        role: Role::Assistant,
-                        content: response.clone(),
-                    },
+                    UserMessage::new(request.clone()).into(),
+                    AssistantMessage::new(response.clone()).into(),
                 ]
                 .into_iter()
             }))
-            .chain(std::iter::once(Message {
-                role: Role::User,
-                content: request,
-            }))
-            .collect()
+            .chain(std::iter::once(UserMessage::new(request).into()))
     }
 
     /// Extend the context with a new pair of request and response.
@@ -78,30 +67,16 @@ impl Context {
 mod tests {
     use super::*;
 
-    /// Compare messages. [`Message`]` does not implement `Eq` :(
-    fn compare_messages(left: Vec<Message>, right: Vec<Message>) -> bool {
-        std::iter::zip(left.into_iter(), right.into_iter()).all(|(left, right)| {
-            left.content == right.content
-                && match (left.role, right.role) {
-                    (Role::System, Role::System) => true,
-                    (Role::User, Role::User) => true,
-                    (Role::Assistant, Role::Assistant) => true,
-                    _ => false,
-                }
-        })
-    }
-
     #[test]
     fn empty() {
         let context = Context::default();
 
-        assert!(compare_messages(
-            context.with_request(String::from("req")),
-            vec![Message {
-                role: Role::User,
-                content: String::from("req"),
-            },]
-        ));
+        assert_eq!(
+            context
+                .with_request(String::from("req"))
+                .collect::<Vec<_>>(),
+            vec![UserMessage::new(String::from("req")).into()],
+        );
     }
 
     #[test]
@@ -109,42 +84,31 @@ mod tests {
         let mut context = Context::default();
         context.push(String::from("req1"), String::from("resp1"));
 
-        assert!(compare_messages(
-            context.with_request(String::from("req2")),
+        assert_eq!(
+            context
+                .with_request(String::from("req2"))
+                .collect::<Vec<_>>(),
             vec![
-                Message {
-                    role: Role::User,
-                    content: String::from("req1"),
-                },
-                Message {
-                    role: Role::Assistant,
-                    content: String::from("resp1"),
-                },
-                Message {
-                    role: Role::User,
-                    content: String::from("req2"),
-                },
-            ]
-        ));
+                UserMessage::new(String::from("req1")).into(),
+                AssistantMessage::new(String::from("resp1")).into(),
+                UserMessage::new(String::from("req2")).into(),
+            ],
+        );
     }
 
     #[test]
     fn empty_with_system_message() {
         let context = Context::new(Some(String::from("system")));
 
-        assert!(compare_messages(
-            context.with_request(String::from("req")),
+        assert_eq!(
+            context
+                .with_request(String::from("req"))
+                .collect::<Vec<_>>(),
             vec![
-                Message {
-                    role: Role::System,
-                    content: String::from("system"),
-                },
-                Message {
-                    role: Role::User,
-                    content: String::from("req"),
-                },
+                SystemMessage::new(String::from("system")).into(),
+                UserMessage::new(String::from("req")).into(),
             ]
-        ));
+        );
     }
 
     #[test]
@@ -152,26 +116,16 @@ mod tests {
         let mut context = Context::new(Some(String::from("system")));
         context.push(String::from("req1"), String::from("resp1"));
 
-        assert!(compare_messages(
-            context.with_request(String::from("req2")),
+        assert_eq!(
+            context
+                .with_request(String::from("req2"))
+                .collect::<Vec<_>>(),
             vec![
-                Message {
-                    role: Role::System,
-                    content: String::from("system"),
-                },
-                Message {
-                    role: Role::User,
-                    content: String::from("req1"),
-                },
-                Message {
-                    role: Role::Assistant,
-                    content: String::from("resp1"),
-                },
-                Message {
-                    role: Role::User,
-                    content: String::from("req2"),
-                },
+                SystemMessage::new(String::from("system")).into(),
+                UserMessage::new(String::from("req1")).into(),
+                AssistantMessage::new(String::from("resp1")).into(),
+                UserMessage::new(String::from("req2")).into(),
             ]
-        ));
+        );
     }
 }

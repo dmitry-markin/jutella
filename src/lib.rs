@@ -25,4 +25,4 @@
 #![warn(missing_docs)]
 
 mod chat_client;
-pub use chat_client::{ChatClient, ChatClientConfig};
+pub use chat_client::client::{ChatClient, ChatClientConfig, Error};
