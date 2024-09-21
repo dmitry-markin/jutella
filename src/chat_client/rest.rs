@@ -20,9 +20,31 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! `jutella` chatbot API client library.
+//! OpenAI REST API client.
 
-#![warn(missing_docs)]
+use serde::{Deserialize, Serialize};
 
-mod chat_client;
-pub use chat_client::{ChatClient, ChatClientConfig};
+/// The role of the message author
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    /// System message
+    System,
+    /// User message
+    User,
+    /// Assistant message
+    Assistant,
+    /// Tool message
+    Tool,
+}
+
+/// Generic message
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Message {
+    /// The role of the message author
+    role: Role,
+    /// The contents of the messgae
+    content: Option<String>,
+    /// An optional name for the participant. Provides the model information to differentiate between participants of the same role.
+    name: Option<String>,
+}
