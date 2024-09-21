@@ -48,7 +48,7 @@ use std::collections::HashMap;
 ///   ]
 /// }
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChatCompletionsBody {
     /// A list of messages comprising the conversation so far.
     messages: Vec<GenericMessage>,
@@ -259,7 +259,7 @@ pub struct ChatCompletionsBody {
 /// }
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
-struct ChatCompletions {
+pub struct ChatCompletions {
     /// A unique identifier for the chat completion.
     id: String,
 
@@ -292,7 +292,7 @@ struct ChatCompletions {
 
 /// Completion choice
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
-struct CompletionChoice {
+pub struct CompletionChoice {
     /// The reason the model stopped generating tokens. This will be `stop` if the model hit a
     /// natural stop point or a provided stop sequence, `length` if the maximum number of tokens
     /// specified in the request was reached, `content_filter` if content was omitted due to a flag
