@@ -26,7 +26,7 @@ use crate::chat_client::{
     context::Context,
     openai_api::{
         chat_completions::ChatCompletionsBody,
-        client::{Error as OpenAiClientError, OpenAiClient},
+        client::{Auth, Error as OpenAiClientError, OpenAiClient},
         message::{self, AssistantMessage},
     },
 };
@@ -36,6 +36,8 @@ use crate::chat_client::{
 pub struct ChatClientConfig {
     /// OpenAI chat API endpoint.
     pub api_url: String,
+    /// API version.
+    pub api_version: Option<String>,
     /// Model.
     pub model: String,
     /// System message to initialize the model.
@@ -48,6 +50,7 @@ impl Default for ChatClientConfig {
     fn default() -> Self {
         Self {
             api_url: String::from("https://models.inference.ai.azure.com/"),
+            api_version: None,
             model: String::from("gpt-4o-mini"),
             system_message: None,
             max_history_tokens: None,
@@ -91,9 +94,10 @@ pub struct ChatClient {
 
 impl ChatClient {
     /// Create new [`ChatClient`] accessing OpenAI chat API with `api_key`.
-    pub fn new(api_key: String, config: ChatClientConfig) -> Result<Self, Error> {
+    pub fn new(auth: Auth, config: ChatClientConfig) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
+            api_version,
             model,
             system_message,
             max_history_tokens,
@@ -110,7 +114,7 @@ impl ChatClient {
         };
 
         Ok(Self {
-            client: OpenAiClient::new(api_key, api_url)?,
+            client: OpenAiClient::new(auth, api_url, api_version)?,
             model,
             context,
             max_history_tokens,
@@ -123,6 +127,7 @@ impl ChatClient {
     pub fn new_with_client(client: reqwest::Client, config: ChatClientConfig) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
+            api_version,
             model,
             system_message,
             max_history_tokens,
@@ -139,7 +144,7 @@ impl ChatClient {
         };
 
         Ok(Self {
-            client: OpenAiClient::new_with_client(client, api_url),
+            client: OpenAiClient::new_with_client(client, api_url, api_version),
             model,
             context,
             max_history_tokens,

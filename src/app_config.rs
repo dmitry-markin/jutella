@@ -25,17 +25,24 @@
 use anyhow::{anyhow, Context as _};
 use clap::Parser;
 use dirs::home_dir;
-use std::{env, fs, io, path::PathBuf};
+use jutella::Auth;
+use std::{fs, path::PathBuf};
+
+const HOME_CONFIG_LOCATION: &str = ".config/jutella.toml";
 
 #[derive(Debug, Parser)]
 #[command(version)]
 #[command(about = "Chatbot API CLI. Currently supports OpenAI chat API.", long_about = None)]
-#[command(after_help = "You can only set `api_key` in config. \
+#[command(after_help = "You can only set API key/token in config. \
                         Command line options override the ones from config.")]
 pub struct Args {
-    /// API url. Default: "https://models.inference.ai.azure.com/".
+    /// Base API url. Default: "https://models.inference.ai.azure.com/".
+    #[arg(short = 'u', long)]
+    api_url: Option<String>,
+
+    /// API version.
     #[arg(short, long)]
-    url: Option<String>,
+    api_version: Option<String>,
 
     /// Model. Default: "gpt-4o-mini".
     #[arg(short, long)]
@@ -43,7 +50,7 @@ pub struct Args {
 
     /// Optional system message to initialize the model. Example: "You are a helpful assistant."
     #[arg(short, long)]
-    system: Option<String>,
+    system_message: Option<String>,
 
     /// Config file location. Default: "$HOME/.config/jutella.toml".
     #[arg(short, long)]
@@ -66,107 +73,99 @@ impl Args {
 
 #[derive(Debug, serde::Deserialize)]
 struct ConfigFile {
+    api_url: Option<String>,
+    api_version: Option<String>,
     api_key: Option<String>,
-    url: Option<String>,
+    api_token: Option<String>,
     model: Option<String>,
     system_message: Option<String>,
-    xclip: Option<bool>,
     max_history_tokens: Option<usize>,
+    xclip: Option<bool>,
 }
 
 pub struct Configuration {
-    pub api_key: String,
     pub api_url: String,
+    pub api_version: Option<String>,
+    pub auth: Auth,
     pub model: String,
     pub system_message: Option<String>,
-    pub xclip: bool,
     pub max_history_tokens: Option<usize>,
+    pub xclip: bool,
 }
 
 impl Configuration {
     pub fn init(args: Args) -> anyhow::Result<Self> {
         let Args {
-            url,
+            api_url,
+            api_version,
             model,
-            system,
+            system_message,
+            max_history_tokens,
             config,
             xclip,
-            max_history_tokens,
         } = args;
 
-        let config: Option<ConfigFile> = if let Some(config_path) = config {
-            // Try reading CLI-provided config file first.
-            Some(
-                toml::from_str(&fs::read_to_string(config_path.clone()).with_context(|| {
-                    anyhow!(
-                        "Failed to read config file {}",
-                        config_path
-                            .to_str()
-                            .expect("to have only unicode characters in path")
-                    )
-                })?)
-                .context("Failed to parse config file {config_path}")?,
+        let config_path = config
+            .ok_or(())
+            .or_else(|()| {
+                home_dir().ok_or(anyhow!(
+                    "Home dir missing, cannot read config from standard location"
+                ))
+            })?
+            .join(HOME_CONFIG_LOCATION);
+
+        let config = fs::read_to_string(config_path.clone()).with_context(|| {
+            anyhow!(
+                "Failed to read config file {}",
+                config_path.to_str().unwrap_or_default()
             )
-        } else {
-            // If there is $HOME, try reading config from standard path.
-            if let Some(config_path) = home_dir().map(|home| home.join(".config/jutella.toml")) {
-                match fs::read_to_string(config_path.clone()) {
-                    Ok(string) => Ok(toml::from_str(&string).with_context(|| {
-                        anyhow!(
-                            "Failed to parse config file {}",
-                            config_path
-                                .to_str()
-                                .expect("to have only unicode characters in path")
-                        )
-                    })?),
-                    Err(error) => match error.kind() {
-                        // Missing config in $HOME is not an error.
-                        io::ErrorKind::NotFound => Ok(None),
-                        _ => Err(error).context("Failed to read config file {config_path}"),
-                    },
-                }?
-            } else {
-                None
+        })?;
+
+        let config: ConfigFile = toml::from_str(&config).with_context(|| {
+            anyhow!(
+                "failed to parse config file {}",
+                config_path.to_str().unwrap_or_default()
+            )
+        })?;
+
+        let auth = match (config.api_token, config.api_key) {
+            (Some(token), None) => Auth::Token(token),
+            (None, Some(api_key)) => Auth::ApiKey(api_key),
+            _ => {
+                return Err(anyhow!(
+                    "Exactly one of `api_key` or `api_token` must be set in config"
+                ))
             }
         };
 
-        let api_key = env::var("OPENAI_API_KEY").or_else(|_| {
-            config
-                .as_ref()
-                .and_then(|c| c.api_key.clone())
-                .ok_or(anyhow!(
-                    "Set `api_key` in config. You can also set `OPENAI_API_KEY` env \
-                     if you know what you are doing."
-                ))
-        })?;
-
-        let api_url = url
-            .or_else(|| config.as_ref().and_then(|c| c.url.clone()))
+        let api_url = api_url
+            .or(config.api_url)
             .unwrap_or_else(|| String::from("https://models.inference.ai.azure.com/"));
 
+        let api_version = api_version.or(config.api_version);
+
         let model = model
-            .or_else(|| config.as_ref().and_then(|c| c.model.clone()))
+            .or(config.model)
             .unwrap_or_else(|| String::from("gpt-4o-mini"));
 
-        let system_message =
-            system.or_else(|| config.as_ref().and_then(|c| c.system_message.clone()));
+        let system_message = system_message.or(config.system_message);
+
+        let max_history_tokens = max_history_tokens.or(config.max_history_tokens);
 
         let xclip = if xclip {
             true
         } else {
-            config.as_ref().and_then(|c| c.xclip).unwrap_or_default()
+            config.xclip.unwrap_or_default()
         };
 
-        let max_history_tokens =
-            max_history_tokens.or_else(|| config.as_ref().and_then(|c| c.max_history_tokens));
-
         Ok(Self {
-            api_key,
             api_url,
+            api_version,
+            auth,
             model,
             system_message,
-            xclip,
             max_history_tokens,
+            xclip,
         })
     }
 }

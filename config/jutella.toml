@@ -1,8 +1,15 @@
-# API auth token.
-api_key = "<API key>"
+# OpenAI API base URL. Everything before `chat/completions` in the URL.
+api_url = "https://api.openai.com/v1/"
 
-# OpenAI chat API endpoint.
-url = "https://models.inference.ai.azure.com/"
+# Optional `api-version` get parameter. Used by Azure endpoints.
+#api_version = "2023-03-15-preview"
+
+# Auth header `api-key: {api_key}`. Used by Azure endpoints.
+# Only one of `api_key` / `api_token` must be set.
+#api_key = "<API key>"
+
+# Auth header `Authorization: Bearer {api_token}`. Used by OpenAI endpoints.
+api_token = "<API token>"
 
 # Model to use.
 model = "gpt-4o-mini"
@@ -10,8 +17,8 @@ model = "gpt-4o-mini"
 # Optional system message to initialize the model.
 system_message = "You are a helpful assistant."
 
-# Copy every response to clipboard with `xclip`.
-xclip = false
-
 # Optinal maximum conversation history to keep.
 max_history_tokens = 2500
+
+# Copy every response to clipboard with `xclip`.
+xclip = false
