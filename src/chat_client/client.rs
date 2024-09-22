@@ -82,6 +82,9 @@ pub enum Error {
     /// Tokenizer initialization error
     #[error("Failed to initialize tokenizer: {0}")]
     TokenizerInit(String),
+    /// No tokenizer setup.
+    #[error("No tokenizer setup. This is a bug.")]
+    NoTokenizer,
 }
 
 /// Chatbot API client.
@@ -104,14 +107,7 @@ impl ChatClient {
         } = config;
 
         let api_url = ensure_trailing_slash(api_url);
-        let context = if max_history_tokens.is_some() {
-            Context::new_with_tokenizer(
-                system_message,
-                tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?,
-            )
-        } else {
-            Context::new(system_message)
-        };
+        let context = create_context(system_message, max_history_tokens.is_some())?;
 
         Ok(Self {
             client: OpenAiClient::new(auth, api_url, api_version)?,
@@ -124,7 +120,10 @@ impl ChatClient {
     /// Cretae new [`ChatClient`] accessing OpenAI chat API with preconfigured [`reqwest::Client`].
     ///
     /// Make sure to setup `Authorization:` header to `Bearer <api_key>"`.
-    pub fn new_with_client(client: reqwest::Client, config: ChatClientConfig) -> Result<Self, Error> {
+    pub fn new_with_client(
+        client: reqwest::Client,
+        config: ChatClientConfig,
+    ) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
             api_version,
@@ -134,14 +133,7 @@ impl ChatClient {
         } = config;
 
         let api_url = ensure_trailing_slash(api_url);
-        let context = if max_history_tokens.is_some() {
-            Context::new_with_tokenizer(
-                system_message,
-                tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?,
-            )
-        } else {
-            Context::new(system_message)
-        };
+        let context = create_context(system_message, max_history_tokens.is_some())?;
 
         Ok(Self {
             client: OpenAiClient::new_with_client(client, api_url, api_version),
@@ -172,8 +164,11 @@ impl ChatClient {
 
         self.context.push(request, answer.clone());
 
-        self.max_history_tokens
-            .map(|max_tokens| self.context.keep_recent(max_tokens));
+        if let Some(max_tokens) = self.max_history_tokens {
+            self.context
+                .keep_recent(max_tokens)
+                .map_err(|_| Error::NoTokenizer)?;
+        }
 
         Ok(answer)
     }
@@ -194,4 +189,17 @@ fn ensure_trailing_slash(url: String) -> String {
     } else {
         url + "/"
     }
+}
+
+fn create_context(system_message: Option<String>, init_tokenizer: bool) -> Result<Context, Error> {
+    let context = if init_tokenizer {
+        Context::new_with_tokenizer(
+            system_message,
+            tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?,
+        )
+    } else {
+        Context::new(system_message)
+    };
+
+    Ok(context)
 }
