@@ -40,6 +40,8 @@ pub struct ChatClientConfig {
     pub model: String,
     /// System message to initialize the model.
     pub system_message: Option<String>,
+    /// Max history tokens to keep in the conversation context.
+    pub max_history_tokens: Option<usize>,
 }
 
 impl Default for ChatClientConfig {
@@ -48,6 +50,7 @@ impl Default for ChatClientConfig {
             api_url: String::from("https://models.inference.ai.azure.com/"),
             model: String::from("gpt-4o-mini"),
             system_message: None,
+            max_history_tokens: None,
         }
     }
 }
@@ -73,6 +76,9 @@ pub enum Error {
     /// Refusal by the model.
     #[error("Model refused the request: \"{0}\"")]
     Refusal(String),
+    /// Tokenizer initialization error
+    #[error("Failed to initialize tokenizer: {0}")]
+    TokenizerInit(String),
 }
 
 /// Chatbot API client.
@@ -80,6 +86,7 @@ pub struct ChatClient {
     client: OpenAiClient,
     model: String,
     context: Context,
+    max_history_tokens: Option<usize>,
 }
 
 impl ChatClient {
@@ -89,34 +96,54 @@ impl ChatClient {
             api_url,
             model,
             system_message,
+            max_history_tokens,
         } = config;
 
         let api_url = ensure_trailing_slash(api_url);
+        let context = if max_history_tokens.is_some() {
+            Context::new_with_tokenizer(
+                system_message,
+                tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?,
+            )
+        } else {
+            Context::new(system_message)
+        };
 
         Ok(Self {
             client: OpenAiClient::new(api_key, api_url)?,
             model,
-            context: Context::new(system_message),
+            context,
+            max_history_tokens,
         })
     }
 
     /// Cretae new [`ChatClient`] accessing OpenAI chat API with preconfigured [`reqwest::Client`].
     ///
     /// Make sure to setup `Authorization:` header to `Bearer <api_key>"`.
-    pub fn new_with_client(client: reqwest::Client, config: ChatClientConfig) -> Self {
+    pub fn new_with_client(client: reqwest::Client, config: ChatClientConfig) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
             model,
             system_message,
+            max_history_tokens,
         } = config;
 
         let api_url = ensure_trailing_slash(api_url);
+        let context = if max_history_tokens.is_some() {
+            Context::new_with_tokenizer(
+                system_message,
+                tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?,
+            )
+        } else {
+            Context::new(system_message)
+        };
 
-        Self {
+        Ok(Self {
             client: OpenAiClient::new_with_client(client, api_url),
             model,
-            context: Context::new(system_message),
-        }
+            context,
+            max_history_tokens,
+        })
     }
 
     /// Ask a new question, extending the chat context after a successful respone.
@@ -139,6 +166,9 @@ impl ChatClient {
         )?;
 
         self.context.push(request, answer.clone());
+
+        self.max_history_tokens
+            .map(|max_tokens| self.context.keep_recent(max_tokens));
 
         Ok(answer)
     }

@@ -12,3 +12,6 @@ system_message = "You are a helpful assistant."
 
 # Copy every response to clipboard with `xclip`.
 xclip = false
+
+# Optinal maximum conversation history to keep.
+max_history_tokens = 2500
