@@ -31,7 +31,7 @@ use serde::Deserialize;
 use std::{fmt::Display, str::FromStr, time::Duration};
 
 const CHAT_COMPLETIONS_ENDPOINT: &str = "chat/completions";
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// Authorization header
 #[derive(Debug)]
