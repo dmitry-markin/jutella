@@ -41,6 +41,7 @@ async fn main() -> anyhow::Result<()> {
         model,
         system_message,
         xclip,
+        max_history_tokens,
     } = Configuration::init(Args::parse())?;
 
     let mut chat = ChatClient::new(
@@ -49,6 +50,7 @@ async fn main() -> anyhow::Result<()> {
             api_url,
             model,
             system_message,
+            max_history_tokens,
         },
     )
     .context("Failed to initialize the client")?;

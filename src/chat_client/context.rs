@@ -31,6 +31,7 @@ use crate::chat_client::openai_api::message::{
 pub struct Context {
     system_message: Option<String>,
     conversation: Vec<(String, String)>,
+    tokenizer: Option<tiktoken_rs::CoreBPE>,
 }
 
 impl Context {
@@ -39,6 +40,19 @@ impl Context {
         Self {
             system_message,
             conversation: Vec::new(),
+            tokenizer: None,
+        }
+    }
+
+    /// Create a new chat context wth tokenizer.
+    pub fn new_with_tokenizer(
+        system_message: Option<String>,
+        tokenizer: tiktoken_rs::CoreBPE,
+    ) -> Self {
+        Self {
+            system_message,
+            conversation: Vec::new(),
+            tokenizer: Some(tokenizer),
         }
     }
 
@@ -60,6 +74,37 @@ impl Context {
     /// Extend the context with a new pair of request and response.
     pub fn push(&mut self, request: String, response: String) {
         self.conversation.push((request, response));
+    }
+
+    /// Discard old records to keep `max_tokens` tokens.
+    pub fn keep_recent(&mut self, max_tokens: usize) -> Result<(), ()> {
+        let Some(ref tokenizer) = self.tokenizer else {
+            return Err(());
+        };
+
+        let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
+
+        let mut tokens = self
+            .system_message
+            .as_ref()
+            .map(|m| num_tokens(m))
+            .unwrap_or_default();
+        let mut keep = 0;
+
+        for transaction in self.conversation.iter().rev() {
+            tokens += num_tokens(&transaction.0) + num_tokens(&transaction.1);
+
+            if tokens > max_tokens {
+                break;
+            }
+
+            keep += 1;
+        }
+
+        let discard = self.conversation.len() - keep;
+        self.conversation.drain(0..discard);
+
+        Ok(())
     }
 }
 

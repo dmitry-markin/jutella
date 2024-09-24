@@ -52,6 +52,10 @@ pub struct Args {
     /// Use `xclip` to copy every response to clipboard.
     #[arg(short, long)]
     xclip: bool,
+
+    /// Keep at most that many tokens in the conversation context.
+    #[arg(short, long)]
+    max_history_tokens: Option<usize>,
 }
 
 impl Args {
@@ -67,6 +71,7 @@ struct ConfigFile {
     model: Option<String>,
     system_message: Option<String>,
     xclip: Option<bool>,
+    max_history_tokens: Option<usize>,
 }
 
 pub struct Configuration {
@@ -75,6 +80,7 @@ pub struct Configuration {
     pub model: String,
     pub system_message: Option<String>,
     pub xclip: bool,
+    pub max_history_tokens: Option<usize>,
 }
 
 impl Configuration {
@@ -85,6 +91,7 @@ impl Configuration {
             system,
             config,
             xclip,
+            max_history_tokens,
         } = args;
 
         let config: Option<ConfigFile> = if let Some(config_path) = config {
@@ -150,12 +157,16 @@ impl Configuration {
             config.as_ref().and_then(|c| c.xclip).unwrap_or_default()
         };
 
+        let max_history_tokens =
+            max_history_tokens.or_else(|| config.as_ref().and_then(|c| c.max_history_tokens));
+
         Ok(Self {
             api_key,
             api_url,
             model,
             system_message,
             xclip,
+            max_history_tokens,
         })
     }
 }
