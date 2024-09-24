@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2024-09-24
+
+This is a bugfix release fixing compilation of the library with `default-features = false`.
+
+### Changed
+
+- Fix compilation of library with `default-features = false` ([commit](https://github.com/dmitry-markin/jutella/commit/3e9493f5ec67fea0cbc35467aa0789d3d5914add))
+
 ## [0.3.0] - 2024-09-24
 
 This release introduces several new features and improvements. Key updates are:
