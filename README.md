@@ -11,6 +11,14 @@ To get started with CLI, put your API key and endpoint into `~/.config/jutella.t
 
 ![Screenshot](doc/screenshot.png)
 
+Invoking the CLI with `jutella -x` makes it copy every response to cliipboard on X11.
+
+### Installation
+
+1. Install `cargo` from https://rustup.rs/.
+2. Install the CLI from [crates.io](https://crates.io/crates/jutella) with `cargo install jutella`.
+3. Alternatively, clone the repo and build the CLI with `cargo build --release`. The resulting executable will be `target/release/jutella`.
+
 
 ## Library
 
