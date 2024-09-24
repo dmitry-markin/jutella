@@ -49,7 +49,7 @@ pub struct ChatClientConfig {
 impl Default for ChatClientConfig {
     fn default() -> Self {
         Self {
-            api_url: String::from("https://models.inference.ai.azure.com/"),
+            api_url: String::from("https://api.openai.com/v1/"),
             api_version: None,
             model: String::from("gpt-4o-mini"),
             system_message: None,

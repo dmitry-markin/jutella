@@ -29,6 +29,8 @@ use jutella::Auth;
 use std::{fs, path::PathBuf};
 
 const HOME_CONFIG_LOCATION: &str = ".config/jutella.toml";
+const DEFAULT_ENDPOINT: &str = "https://api.openai.com/v1/";
+const DEFAULT_MODEL: &str = "gpt-4o-mini";
 
 #[derive(Debug, Parser)]
 #[command(version)]
@@ -36,7 +38,7 @@ const HOME_CONFIG_LOCATION: &str = ".config/jutella.toml";
 #[command(after_help = "You can only set API key/token in config. \
                         Command line options override the ones from config.")]
 pub struct Args {
-    /// Base API url. Default: "https://models.inference.ai.azure.com/".
+    /// Base API url. Default: "https://api.openai.com/v1/".
     #[arg(short = 'u', long)]
     api_url: Option<String>,
 
@@ -44,7 +46,7 @@ pub struct Args {
     #[arg(short, long)]
     api_version: Option<String>,
 
-    /// Model. Default: "gpt-4o-mini".
+    /// Model. Default: "gpt-4o-mini". You likely need to include the version date.
     #[arg(short, long)]
     model: Option<String>,
 
@@ -140,13 +142,13 @@ impl Configuration {
 
         let api_url = api_url
             .or(config.api_url)
-            .unwrap_or_else(|| String::from("https://models.inference.ai.azure.com/"));
+            .unwrap_or_else(|| String::from(DEFAULT_ENDPOINT));
 
         let api_version = api_version.or(config.api_version);
 
         let model = model
             .or(config.model)
-            .unwrap_or_else(|| String::from("gpt-4o-mini"));
+            .unwrap_or_else(|| String::from(DEFAULT_MODEL));
 
         let system_message = system_message.or(config.system_message);
 
