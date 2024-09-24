@@ -17,19 +17,14 @@ To get started with CLI, put your API key and endpoint into `~/.config/jutella.t
 To use the chat API, initialize `ChatClient` with `api_key` and `ChatClientConfig`:
 
 ```rust
-let mut chat = ChatClient::new(api_key, ChatClientConfig::default());
+let mut chat = ChatClient::new(api_key, ChatClientConfig::default())?;
 ```
 
 Request replies via `ChatClient::ask()`:
 
 ```rust
-let answer = chat.ask("What is the highest point on Earth?".to_string())?;
-println!("The answer is: {answer}");
+let answer = chat.ask("What is the highest point on Earth?".to_string()).await?;
+println!("{answer}");
 ```
 
-`ChatClient` keeps the conversation context and sends it with every `ask()` to the chatbot API.
-
-
-## Future plans
-
-Expect breaking changes in the API and transition to async requests.
+`ChatClient` keeps the conversation context and sends it with every `ask()` to the chatbot API to generate the reply.

@@ -11,9 +11,11 @@ anyhow = { version = "1.0.89", optional = true }
 clap = { version = "4.5.17", features = ["derive", "wrap_help"], optional = true }
 colored = { version = "2.1.0", optional = true }
 dirs = { version = "5.0.1", optional = true }
-openai_api_rust = "0.1.9"
+reqwest = { version = "0.12.7", default-features = false, features = ["gzip", "json", "hickory-dns", "http2", "rustls-tls", "zstd" ] }
 serde = { version = "1.0.210", features = ["derive"], optional = true }
+serde_json = "1.0.128"
 thiserror = "1.0.63"
+tokio = { version = "1.40.0", features = ["rt-multi-thread", "macros"] }
 toml = { version = "0.8.19", optional = true }
 
 [features]

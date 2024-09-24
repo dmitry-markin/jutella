@@ -33,7 +33,8 @@ use std::{
     process::{Command, Stdio},
 };
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let Configuration {
         api_key,
         api_url,
@@ -49,12 +50,13 @@ fn main() -> anyhow::Result<()> {
             model,
             system_message,
         },
-    );
+    )
+    .context("Failed to initialize the client")?;
 
     print_prompt()?;
 
     for line in io::stdin().lines() {
-        if let Ok(response) = chat.ask(line?).inspect_err(|e| print_error(e)) {
+        if let Ok(response) = chat.ask(line?).await.inspect_err(|e| print_error(e)) {
             print_response(&response);
 
             if xclip {

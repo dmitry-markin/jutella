@@ -20,9 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//! `jutella` chatbot API client library.
+//! OpenAI REST API.
 
-#![warn(missing_docs)]
-
-mod chat_client;
-pub use chat_client::client::{ChatClient, ChatClientConfig, Error};
+pub mod chat_completions;
+pub mod client;
+pub mod message;
