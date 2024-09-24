@@ -11,7 +11,7 @@ To get started with CLI, put your API key and endpoint into `~/.config/jutella.t
 
 ![Screenshot](doc/screenshot.png)
 
-Invoking the CLI with `jutella -x` makes it copy every response to cliipboard on X11.
+Invoking the CLI with `jutella -x` makes it copy every response to clipboard on X11.
 
 ### Installation
 
