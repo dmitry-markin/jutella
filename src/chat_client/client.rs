@@ -64,27 +64,24 @@ pub enum Error {
     /// Error reported by the model API.
     #[error("OpenAI API client error: {0}")]
     OpenAiClient(#[from] OpenAiClientError),
-    /// No choices returned.
+    /// The response contains no completion choices.
     #[error("Response contains no choices")]
     NoChoices,
-    /// No message.
+    /// The response contains no message.
     #[error("Response contains no message")]
     NoMessage,
     /// Message conversion error.
     #[error("Invalid message: {0}")]
     InvalidMessage(#[from] message::Error),
-    /// No content.
+    /// The completion response message contains no `content`.
     #[error("Assistant message contains no `content`")]
     NoContent,
-    /// Refusal by the model.
+    /// Model refused the request.
     #[error("Model refused the request: \"{0}\"")]
     Refusal(String),
-    /// Tokenizer initialization error
+    /// Tokenizer initialization error.
     #[error("Failed to initialize tokenizer: {0}")]
     TokenizerInit(String),
-    /// No tokenizer setup.
-    #[error("No tokenizer setup. This is a bug.")]
-    NoTokenizer,
 }
 
 /// Chatbot API client.
@@ -96,7 +93,7 @@ pub struct ChatClient {
 }
 
 impl ChatClient {
-    /// Create new [`ChatClient`] accessing OpenAI chat API with `api_key`.
+    /// Create new [`ChatClient`] accessing OpenAI chat API.
     pub fn new(auth: Auth, config: ChatClientConfig) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
@@ -119,7 +116,8 @@ impl ChatClient {
 
     /// Cretae new [`ChatClient`] accessing OpenAI chat API with preconfigured [`reqwest::Client`].
     ///
-    /// Make sure to setup `Authorization:` header to `Bearer <api_key>"`.
+    /// Make sure to setup a header `Authorization: Bearer {api_key}` if using OpenAI endpoints,
+    /// or `api-key: {api_key}` header if using Azure endpoints.
     pub fn new_with_client(
         client: reqwest::Client,
         config: ChatClientConfig,
@@ -165,9 +163,10 @@ impl ChatClient {
         self.context.push(request, answer.clone());
 
         if let Some(max_tokens) = self.max_history_tokens {
-            self.context
-                .keep_recent(max_tokens)
-                .map_err(|_| Error::NoTokenizer)?;
+            self.context.keep_recent(max_tokens).expect(
+                "if `max_history_tokens` is `Some` and we got here, \
+                 context was successfully initialized with a tokenizer; qed",
+            );
         }
 
         Ok(answer)

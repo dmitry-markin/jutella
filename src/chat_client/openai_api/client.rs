@@ -33,12 +33,14 @@ use std::{fmt::Display, str::FromStr, time::Duration};
 const CHAT_COMPLETIONS_ENDPOINT: &str = "chat/completions";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
 
-/// Authorization header
+/// Authorization header.
+///
+/// Use `HeaderMap::try_from(auth)` to convert to `reqwest` headers.
 #[derive(Debug)]
 pub enum Auth {
-    /// Auth header "Authorization: Bearer {api_token}"
+    /// Auth header `Authorization: Bearer {api_token}`.
     Token(String),
-    /// Auth header "api-key: {api_key}".
+    /// Auth header `api-key: {api_key}`.
     ApiKey(String),
 }
 
