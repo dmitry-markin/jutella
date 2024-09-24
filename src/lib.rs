@@ -25,4 +25,7 @@
 #![warn(missing_docs)]
 
 mod chat_client;
-pub use chat_client::client::{ChatClient, ChatClientConfig, Error};
+pub use chat_client::{
+    client::{ChatClient, ChatClientConfig, Error},
+    openai_api::client::Auth,
+};

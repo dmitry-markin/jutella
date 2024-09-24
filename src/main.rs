@@ -36,7 +36,8 @@ use std::{
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let Configuration {
-        api_key,
+        auth,
+        api_version,
         api_url,
         model,
         system_message,
@@ -45,9 +46,10 @@ async fn main() -> anyhow::Result<()> {
     } = Configuration::init(Args::parse())?;
 
     let mut chat = ChatClient::new(
-        api_key,
+        auth,
         ChatClientConfig {
             api_url,
+            api_version,
             model,
             system_message,
             max_history_tokens,

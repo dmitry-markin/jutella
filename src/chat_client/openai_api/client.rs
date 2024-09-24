@@ -24,44 +24,72 @@
 
 use crate::chat_client::openai_api::chat_completions::{ChatCompletions, ChatCompletionsBody};
 use reqwest::{
-    header::{HeaderValue, InvalidHeaderValue, AUTHORIZATION},
+    header::{HeaderMap, HeaderName, HeaderValue, InvalidHeaderValue, AUTHORIZATION},
     Client, ClientBuilder, StatusCode,
 };
 use serde::Deserialize;
-use std::{fmt::Display, time::Duration};
+use std::{fmt::Display, str::FromStr, time::Duration};
 
 const CHAT_COMPLETIONS_ENDPOINT: &str = "chat/completions";
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// Authorization header
+#[derive(Debug)]
+pub enum Auth {
+    /// Auth header "Authorization: Bearer {api_token}"
+    Token(String),
+    /// Auth header "api-key: {api_key}".
+    ApiKey(String),
+}
+
+impl TryFrom<Auth> for HeaderMap {
+    type Error = InvalidHeaderValue;
+
+    fn try_from(auth: Auth) -> Result<Self, InvalidHeaderValue> {
+        let headers = match auth {
+            Auth::Token(token) => [(
+                AUTHORIZATION,
+                HeaderValue::from_str(&format!("Bearer {token}"))?,
+            )],
+            Auth::ApiKey(api_key) => [(
+                HeaderName::from_str("api-key").expect("to be valid ASCII"),
+                HeaderValue::from_str(&api_key)?,
+            )],
+        }
+        .into_iter()
+        .collect();
+
+        Ok(headers)
+    }
+}
 
 /// OpenAI REST API client.
 pub struct OpenAiClient {
     client: Client,
-    base_url: String,
+    endpoint: String,
 }
 
 impl OpenAiClient {
     /// Create new OpenAI API client.
-    pub fn new(api_key: String, base_url: String) -> Result<Self, Error> {
+    pub fn new(auth: Auth, base_url: String, api_version: Option<String>) -> Result<Self, Error> {
         let client = ClientBuilder::new()
-            .default_headers(
-                [(
-                    AUTHORIZATION,
-                    HeaderValue::from_str(&format!("Bearer {api_key}"))?,
-                )]
-                .into_iter()
-                .collect(),
-            )
+            .default_headers(auth.try_into()?)
             .timeout(REQUEST_TIMEOUT)
             .build()?;
 
-        Ok(Self { client, base_url })
+        let endpoint = build_url(base_url, api_version);
+
+        Ok(Self { client, endpoint })
     }
 
     /// Create new OpenAI API client with custom [`reqwest::Client`].
     ///
-    /// You are responsible for configuring `Authorization:` header!
-    pub fn new_with_client(client: Client, base_url: String) -> Self {
-        Self { client, base_url }
+    /// You are responsible for configuration of authorization headers!
+    pub fn new_with_client(client: Client, base_url: String, api_version: Option<String>) -> Self {
+        Self {
+            client,
+            endpoint: build_url(base_url, api_version),
+        }
     }
 
     /// Request chat completion message.
@@ -71,7 +99,7 @@ impl OpenAiClient {
     ) -> Result<ChatCompletions, Error> {
         let response = self
             .client
-            .post(self.base_url.clone() + CHAT_COMPLETIONS_ENDPOINT)
+            .post(self.endpoint.clone())
             .json(&body)
             .send()
             .await?;
@@ -95,6 +123,14 @@ impl OpenAiClient {
             }
             .into())
         }
+    }
+}
+
+fn build_url(base_url: String, api_version: Option<String>) -> String {
+    if let Some(version) = api_version {
+        format!("{base_url}{CHAT_COMPLETIONS_ENDPOINT}?api-version={version}")
+    } else {
+        format!("{base_url}{CHAT_COMPLETIONS_ENDPOINT}")
     }
 }
 

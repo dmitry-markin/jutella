@@ -23,5 +23,5 @@
 //! Chatbot API client library.
 
 pub mod client;
-mod context;
-mod openai_api;
+pub mod context;
+pub mod openai_api;

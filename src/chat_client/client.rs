@@ -26,7 +26,7 @@ use crate::chat_client::{
     context::Context,
     openai_api::{
         chat_completions::ChatCompletionsBody,
-        client::{Error as OpenAiClientError, OpenAiClient},
+        client::{Auth, Error as OpenAiClientError, OpenAiClient},
         message::{self, AssistantMessage},
     },
 };
@@ -36,6 +36,8 @@ use crate::chat_client::{
 pub struct ChatClientConfig {
     /// OpenAI chat API endpoint.
     pub api_url: String,
+    /// API version.
+    pub api_version: Option<String>,
     /// Model.
     pub model: String,
     /// System message to initialize the model.
@@ -47,7 +49,8 @@ pub struct ChatClientConfig {
 impl Default for ChatClientConfig {
     fn default() -> Self {
         Self {
-            api_url: String::from("https://models.inference.ai.azure.com/"),
+            api_url: String::from("https://api.openai.com/v1/"),
+            api_version: None,
             model: String::from("gpt-4o-mini"),
             system_message: None,
             max_history_tokens: None,
@@ -79,6 +82,9 @@ pub enum Error {
     /// Tokenizer initialization error
     #[error("Failed to initialize tokenizer: {0}")]
     TokenizerInit(String),
+    /// No tokenizer setup.
+    #[error("No tokenizer setup. This is a bug.")]
+    NoTokenizer,
 }
 
 /// Chatbot API client.
@@ -91,26 +97,20 @@ pub struct ChatClient {
 
 impl ChatClient {
     /// Create new [`ChatClient`] accessing OpenAI chat API with `api_key`.
-    pub fn new(api_key: String, config: ChatClientConfig) -> Result<Self, Error> {
+    pub fn new(auth: Auth, config: ChatClientConfig) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
+            api_version,
             model,
             system_message,
             max_history_tokens,
         } = config;
 
         let api_url = ensure_trailing_slash(api_url);
-        let context = if max_history_tokens.is_some() {
-            Context::new_with_tokenizer(
-                system_message,
-                tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?,
-            )
-        } else {
-            Context::new(system_message)
-        };
+        let context = create_context(system_message, max_history_tokens.is_some())?;
 
         Ok(Self {
-            client: OpenAiClient::new(api_key, api_url)?,
+            client: OpenAiClient::new(auth, api_url, api_version)?,
             model,
             context,
             max_history_tokens,
@@ -120,26 +120,23 @@ impl ChatClient {
     /// Cretae new [`ChatClient`] accessing OpenAI chat API with preconfigured [`reqwest::Client`].
     ///
     /// Make sure to setup `Authorization:` header to `Bearer <api_key>"`.
-    pub fn new_with_client(client: reqwest::Client, config: ChatClientConfig) -> Result<Self, Error> {
+    pub fn new_with_client(
+        client: reqwest::Client,
+        config: ChatClientConfig,
+    ) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
+            api_version,
             model,
             system_message,
             max_history_tokens,
         } = config;
 
         let api_url = ensure_trailing_slash(api_url);
-        let context = if max_history_tokens.is_some() {
-            Context::new_with_tokenizer(
-                system_message,
-                tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?,
-            )
-        } else {
-            Context::new(system_message)
-        };
+        let context = create_context(system_message, max_history_tokens.is_some())?;
 
         Ok(Self {
-            client: OpenAiClient::new_with_client(client, api_url),
+            client: OpenAiClient::new_with_client(client, api_url, api_version),
             model,
             context,
             max_history_tokens,
@@ -167,8 +164,11 @@ impl ChatClient {
 
         self.context.push(request, answer.clone());
 
-        self.max_history_tokens
-            .map(|max_tokens| self.context.keep_recent(max_tokens));
+        if let Some(max_tokens) = self.max_history_tokens {
+            self.context
+                .keep_recent(max_tokens)
+                .map_err(|_| Error::NoTokenizer)?;
+        }
 
         Ok(answer)
     }
@@ -189,4 +189,17 @@ fn ensure_trailing_slash(url: String) -> String {
     } else {
         url + "/"
     }
+}
+
+fn create_context(system_message: Option<String>, init_tokenizer: bool) -> Result<Context, Error> {
+    let context = if init_tokenizer {
+        Context::new_with_tokenizer(
+            system_message,
+            tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?,
+        )
+    } else {
+        Context::new(system_message)
+    };
+
+    Ok(context)
 }
