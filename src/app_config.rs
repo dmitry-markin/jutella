@@ -63,7 +63,7 @@ pub struct Args {
     xclip: bool,
 
     /// Keep at most that many tokens in the conversation context.
-    #[arg(short, long)]
+    #[arg(short = 't', long)]
     max_history_tokens: Option<usize>,
 }
 
@@ -107,14 +107,13 @@ impl Configuration {
             xclip,
         } = args;
 
-        let config_path = config
-            .ok_or(())
-            .or_else(|()| {
-                home_dir().ok_or(anyhow!(
+        let config_path = config.ok_or(()).or_else(|()| {
+            home_dir()
+                .ok_or(anyhow!(
                     "Home dir missing, cannot read config from standard location"
                 ))
-            })?
-            .join(HOME_CONFIG_LOCATION);
+                .map(|p| p.join(HOME_CONFIG_LOCATION))
+        })?;
 
         let config = fs::read_to_string(config_path.clone()).with_context(|| {
             anyhow!(
