@@ -33,7 +33,7 @@ use std::collections::HashMap;
 /// See https://platform.openai.com/docs/api-reference/chat/create.
 ///
 /// JSON example:
-/// ```
+/// ```json
 /// {
 ///   "model": "gpt-4o",
 ///   "messages": [
@@ -231,7 +231,7 @@ pub struct ChatCompletionsBody {
 /// See https://platform.openai.com/docs/api-reference/chat/object.
 ///
 /// JSON example:
-/// ```
+/// ```json
 /// {
 ///   "id": "chatcmpl-123",
 ///   "object": "chat.completion",
