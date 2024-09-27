@@ -1,4 +1,4 @@
-// Copyright (c) 2024 `jutella` chatbot API client developers
+// Copyright (c) 2024 Dmitry Markin
 //
 // SPDX-License-Identifier: MIT
 //
@@ -86,7 +86,7 @@ impl OpenAiClient {
 
     /// Create new OpenAI API client with custom [`reqwest::Client`].
     ///
-    /// You are responsible for configuration of authorization headers!
+    /// You are responsible for configuration of authorization headers and the request timeout!
     pub fn new_with_client(client: Client, base_url: String, api_version: Option<String>) -> Self {
         Self {
             client,

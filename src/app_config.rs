@@ -1,4 +1,4 @@
-// Copyright (c) 2024 `jutella` chatbot API client developers
+// Copyright (c) 2024 Dmitry Markin
 //
 // SPDX-License-Identifier: MIT
 //

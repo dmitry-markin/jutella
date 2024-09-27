@@ -1,15 +1,15 @@
 # OpenAI API base URL. Everything before `chat/completions` in the URL.
 api_url = "https://api.openai.com/v1/"
 
-# Optional `api-version` get parameter. Used by Azure endpoints.
-#api_version = "2023-03-15-preview"
+# Auth header `Authorization: Bearer {api_token}`, used by OpenAI endpoints.
+api_token = "<API token>"
 
-# Auth header `api-key: {api_key}`. Used by Azure endpoints.
+# Auth header `api-key: {api_key}`, used by Azure endpoints.
 # Only one of `api_key` & `api_token` must be set.
 #api_key = "<API key>"
 
-# Auth header `Authorization: Bearer {api_token}`. Used by OpenAI endpoints.
-api_token = "<API token>"
+# Optional `api-version` GET parameter, used by Azure endpoints.
+#api_version = "2023-03-15-preview"
 
 # Model to use.
 model = "gpt-4o-mini"
@@ -17,8 +17,8 @@ model = "gpt-4o-mini"
 # Optional system message to initialize the model.
 system_message = "You are a helpful assistant."
 
-# Optional maximum conversation history to keep.
+# Optional maximum conversation history to keep in the context.
 max_history_tokens = 2500
 
-# Copy every response to clipboard with `xclip`.
+# Copy every response to clipboard via `xclip`.
 xclip = false
