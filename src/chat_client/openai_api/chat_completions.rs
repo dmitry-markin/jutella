@@ -286,7 +286,7 @@ pub struct ChatCompletions {
     pub object: String,
 
     /// Usage statistics for the completion request.
-    pub usage: Value,
+    pub usage: Usage,
 }
 
 /// Completion choice
@@ -307,4 +307,23 @@ pub struct CompletionChoice {
 
     ///  Log probability information for the choice.
     pub logprobs: Option<Value>,
+}
+
+/// Usage details
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+pub struct Usage {
+    /// Number of tokens in the prompt.
+    pub prompt_tokens: usize,
+
+    /// Number of tokens in the generated completion.
+    pub completion_tokens: usize,
+
+    /// Total number of tokens used in the request (prompt + completion).
+    pub total_tokens: usize,
+
+    /// Breakdown of tokens used in the prompt.
+    pub prompt_tokens_details: Option<Value>,
+
+    /// Breakdown of tokens used in a completion.
+    pub completion_tokens_details: Option<Value>,
 }
