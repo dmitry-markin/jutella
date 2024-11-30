@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2024-11-30
 
-This release adds `min_history_tokens` context window rolling strategy. It can be handy to keep the last big response in the context. Additionaly, the API now provides token usage info.
+This release adds `min_history_tokens` context window rolling strategy. It can be handy to keep the last big response in the context. Additionally, the API now provides token usage info.
 
 ### Added
 
