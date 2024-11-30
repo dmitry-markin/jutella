@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2024-11-30
+
+This release adds `min_history_tokens` context window rolling strategy. It can be handy to keep the last big response in the context. Additionaly, the API now provides token usage info.
+
+### Added
+
+- Extend API to report tokens used ([#8](https://github.com/dmitry-markin/jutella/pull/8))
+- Add `min_history_tokens` rolling context window strategy ([#7](https://github.com/dmitry-markin/jutella/pull/7))
+
+### Fixed
+
+- Fix loading config file passed as CLI option ([commit](https://github.com/dmitry-markin/jutella/commit/be668dcfb3f082e54e437088d64234af7e5f650e))
+- Remove impossible `Error::NoTokenizer` and update docs ([commit](https://github.com/dmitry-markin/jutella/commit/4aef26a43024f0390775da07b26c4ae7a5c378aa))
+
 ## [0.3.1] - 2024-09-24
 
 This is a bugfix release fixing compilation of the library with `default-features = false`.
