@@ -45,10 +45,10 @@ pub struct ChatClientConfig {
     /// Min history tokens to keep in the conversation context.
     ///
     /// The context will be truncated to keep at least `min_history_tokens`, but
-    /// no more than one request-reply to go above this threshold, and under
+    /// no more than one request-response above this threshold, and under
     /// no circumstances more than `max_history_tokens`.
-    /// This way of truncation ensures that at least the latest round of messages
-    /// is always kept in the context (unless `max_history_tokens` kicks in).
+    /// This method of context truncation ensures that at least the latest
+    /// round of messages is always kept (unless `max_history_tokens` kicks in).
     pub min_history_tokens: Option<usize>,
     /// Max history tokens to keep in the conversation context.
     pub max_history_tokens: Option<usize>,
