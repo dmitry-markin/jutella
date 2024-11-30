@@ -26,6 +26,6 @@
 
 mod chat_client;
 pub use chat_client::{
-    client::{ChatClient, ChatClientConfig, Error},
+    client::{ChatClient, ChatClientConfig, Completion, Error},
     openai_api::client::Auth,
 };
