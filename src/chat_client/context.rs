@@ -25,6 +25,7 @@
 use crate::chat_client::openai_api::message::{
     AssistantMessage, Message, SystemMessage, UserMessage,
 };
+use iter_accumulate::IterAccumulate;
 
 /// Chatbot context.
 #[derive(Debug, Default, Clone)]
@@ -32,6 +33,8 @@ pub struct Context {
     system_message: Option<String>,
     conversation: Vec<(String, String)>,
     tokenizer: Option<tiktoken_rs::CoreBPE>,
+    min_history_tokens: Option<usize>,
+    max_history_tokens: Option<usize>,
 }
 
 impl Context {
@@ -41,18 +44,26 @@ impl Context {
             system_message,
             conversation: Vec::new(),
             tokenizer: None,
+            min_history_tokens: None,
+            max_history_tokens: None,
         }
     }
 
     /// Create a new chat context wth tokenizer.
-    pub fn new_with_tokenizer(
+    pub fn new_with_rolling_window(
         system_message: Option<String>,
         tokenizer: tiktoken_rs::CoreBPE,
+        min_history_tokens: Option<usize>,
+        max_history_tokens: Option<usize>,
     ) -> Self {
+        debug_assert!(min_history_tokens.is_some() || max_history_tokens.is_some());
+
         Self {
             system_message,
             conversation: Vec::new(),
             tokenizer: Some(tokenizer),
+            min_history_tokens,
+            max_history_tokens,
         }
     }
 
@@ -74,37 +85,40 @@ impl Context {
     /// Extend the context with a new pair of request and response.
     pub fn push(&mut self, request: String, response: String) {
         self.conversation.push((request, response));
+        self.keep_recent();
     }
 
-    /// Discard old records to keep `max_tokens` tokens.
-    pub fn keep_recent(&mut self, max_tokens: usize) -> Result<(), ()> {
+    /// Discard old records to keep the context within the limits.
+    fn keep_recent(&mut self) {
         let Some(ref tokenizer) = self.tokenizer else {
-            return Err(());
+            return;
         };
+
+        // At least one of the numbers is limited if tokenizer is set.
+        debug_assert!(self.min_history_tokens.is_some() || self.max_history_tokens.is_some());
+        let min_tokens = self.min_history_tokens.unwrap_or(usize::MAX);
+        let max_tokens = self.max_history_tokens.unwrap_or(usize::MAX);
 
         let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
 
-        let mut tokens = self
+        let system_tokens = self
             .system_message
             .as_ref()
             .map(|m| num_tokens(m))
             .unwrap_or_default();
-        let mut keep = 0;
 
-        for transaction in self.conversation.iter().rev() {
-            tokens += num_tokens(&transaction.0) + num_tokens(&transaction.1);
-
-            if tokens > max_tokens {
-                break;
-            }
-
-            keep += 1;
-        }
+        let keep = self
+            .conversation
+            .iter()
+            .rev()
+            .map(|transaction| num_tokens(&transaction.0) + num_tokens(&transaction.1))
+            .accumulate((0, system_tokens), |(_, acc), x| (acc, acc + x))
+            .map_while(|(prev, current)| (prev <= min_tokens).then_some(current))
+            .take_while(|current| *current <= max_tokens)
+            .count();
 
         let discard = self.conversation.len() - keep;
         self.conversation.drain(0..discard);
-
-        Ok(())
     }
 }
 

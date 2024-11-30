@@ -42,6 +42,14 @@ pub struct ChatClientConfig {
     pub model: String,
     /// System message to initialize the model.
     pub system_message: Option<String>,
+    /// Min history tokens to keep in the conversation context.
+    ///
+    /// The context will be truncated to keep at least `min_history_tokens`, but
+    /// no more than one request-reply to go above this threshold, and under
+    /// no circumstances more than `max_history_tokens`.
+    /// This way of truncation ensures that at least the latest round of messages
+    /// is always kept in the context (unless `max_history_tokens` kicks in).
+    pub min_history_tokens: Option<usize>,
     /// Max history tokens to keep in the conversation context.
     pub max_history_tokens: Option<usize>,
 }
@@ -53,6 +61,7 @@ impl Default for ChatClientConfig {
             api_version: None,
             model: String::from("gpt-4o-mini"),
             system_message: None,
+            min_history_tokens: None,
             max_history_tokens: None,
         }
     }
@@ -89,7 +98,6 @@ pub struct ChatClient {
     client: OpenAiClient,
     model: String,
     context: Context,
-    max_history_tokens: Option<usize>,
 }
 
 impl ChatClient {
@@ -100,17 +108,17 @@ impl ChatClient {
             api_version,
             model,
             system_message,
+            min_history_tokens,
             max_history_tokens,
         } = config;
 
         let api_url = ensure_trailing_slash(api_url);
-        let context = create_context(system_message, max_history_tokens.is_some())?;
+        let context = create_context(system_message, min_history_tokens, max_history_tokens)?;
 
         Ok(Self {
             client: OpenAiClient::new(auth, api_url, api_version)?,
             model,
             context,
-            max_history_tokens,
         })
     }
 
@@ -127,17 +135,17 @@ impl ChatClient {
             api_version,
             model,
             system_message,
+            min_history_tokens,
             max_history_tokens,
         } = config;
 
         let api_url = ensure_trailing_slash(api_url);
-        let context = create_context(system_message, max_history_tokens.is_some())?;
+        let context = create_context(system_message, min_history_tokens, max_history_tokens)?;
 
         Ok(Self {
             client: OpenAiClient::new_with_client(client, api_url, api_version),
             model,
             context,
-            max_history_tokens,
         })
     }
 
@@ -162,13 +170,6 @@ impl ChatClient {
 
         self.context.push(request, answer.clone());
 
-        if let Some(max_tokens) = self.max_history_tokens {
-            self.context.keep_recent(max_tokens).expect(
-                "if `max_history_tokens` is `Some` and we got here, \
-                 context was successfully initialized with a tokenizer; qed",
-            );
-        }
-
         Ok(answer)
     }
 
@@ -190,11 +191,17 @@ fn ensure_trailing_slash(url: String) -> String {
     }
 }
 
-fn create_context(system_message: Option<String>, init_tokenizer: bool) -> Result<Context, Error> {
-    let context = if init_tokenizer {
-        Context::new_with_tokenizer(
+fn create_context(
+    system_message: Option<String>,
+    min_history_tokens: Option<usize>,
+    max_history_tokens: Option<usize>,
+) -> Result<Context, Error> {
+    let context = if min_history_tokens.is_some() || max_history_tokens.is_some() {
+        Context::new_with_rolling_window(
             system_message,
             tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?,
+            min_history_tokens,
+            max_history_tokens,
         )
     } else {
         Context::new(system_message)
