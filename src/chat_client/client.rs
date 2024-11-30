@@ -67,6 +67,17 @@ impl Default for ChatClientConfig {
     }
 }
 
+/// Generated completion.
+#[derive(Debug)]
+pub struct Completion {
+    /// Generated response.
+    pub response: String,
+    /// Input tokens used.
+    pub tokens_in: usize,
+    /// Output tokens used.
+    pub tokens_out: usize,
+}
+
 /// Errors during interaction with a chatbot.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -151,7 +162,12 @@ impl ChatClient {
 
     /// Ask a new question, extending the chat context after a successful respone.
     pub async fn ask(&mut self, request: String) -> Result<String, Error> {
-        let mut response = self
+        self.request_completion(request).await.map(|c| c.response)
+    }
+
+    /// Request completion, extending the chat context after a successful respone.
+    pub async fn request_completion(&mut self, request: String) -> Result<Completion, Error> {
+        let mut completion = self
             .client
             .chat_completions(Self::body(
                 self.model.clone(),
@@ -160,17 +176,23 @@ impl ChatClient {
             ))
             .await?;
 
-        let choice = response.choices.pop().ok_or(Error::NoChoices)?;
+        let choice = completion.choices.pop().ok_or(Error::NoChoices)?;
         let assistant_message = AssistantMessage::try_from(choice.message)?;
-        let answer = assistant_message.content.ok_or(
+        let response = assistant_message.content.ok_or(
             assistant_message
                 .refusal
                 .map_or(Error::NoContent, Error::Refusal),
         )?;
 
-        self.context.push(request, answer.clone());
+        // TODO: we likely need to count tokens used in case of errors as well.
 
-        Ok(answer)
+        self.context.push(request, response.clone());
+
+        Ok(Completion {
+            response,
+            tokens_in: completion.usage.prompt_tokens,
+            tokens_out: completion.usage.completion_tokens,
+        })
     }
 
     /// Construct a request body.
