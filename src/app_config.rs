@@ -35,8 +35,8 @@ const DEFAULT_MODEL: &str = "gpt-4o-mini";
 #[derive(Debug, Parser)]
 #[command(version)]
 #[command(about = "Chatbot API CLI. Currently supports OpenAI chat API.", long_about = None)]
-#[command(after_help = "You can only set API key/token in config. \
-                        Command line options override the ones from config.")]
+#[command(after_help = "You can only set API key/token in the config. \
+                        Command line options override the ones in the config.")]
 pub struct Args {
     /// Base API url. Default: "https://api.openai.com/v1/".
     #[arg(short = 'u', long)]
@@ -62,6 +62,16 @@ pub struct Args {
     #[arg(short, long)]
     xclip: bool,
 
+    /// Keep at least that many tokens in the conversation context.
+    ///
+    /// The context will be truncated to keep at least `min_history_tokens`, but
+    /// no more than one request-response above this threshold, and under
+    /// no circumstances more than `max_history_tokens`.
+    /// This method of context truncation ensures that at least the latest round of
+    /// messages is always kept (unless `max_history_tokens` kicks in).
+    #[arg(short = 'n', long)]
+    min_history_tokens: Option<usize>,
+
     /// Keep at most that many tokens in the conversation context.
     #[arg(short = 't', long)]
     max_history_tokens: Option<usize>,
@@ -81,6 +91,7 @@ struct ConfigFile {
     api_token: Option<String>,
     model: Option<String>,
     system_message: Option<String>,
+    min_history_tokens: Option<usize>,
     max_history_tokens: Option<usize>,
     xclip: Option<bool>,
 }
@@ -91,6 +102,7 @@ pub struct Configuration {
     pub auth: Auth,
     pub model: String,
     pub system_message: Option<String>,
+    pub min_history_tokens: Option<usize>,
     pub max_history_tokens: Option<usize>,
     pub xclip: bool,
 }
@@ -102,6 +114,7 @@ impl Configuration {
             api_version,
             model,
             system_message,
+            min_history_tokens,
             max_history_tokens,
             config,
             xclip,
@@ -151,6 +164,7 @@ impl Configuration {
 
         let system_message = system_message.or(config.system_message);
 
+        let min_history_tokens = min_history_tokens.or(config.min_history_tokens);
         let max_history_tokens = max_history_tokens.or(config.max_history_tokens);
 
         let xclip = if xclip {
@@ -165,6 +179,7 @@ impl Configuration {
             auth,
             model,
             system_message,
+            min_history_tokens,
             max_history_tokens,
             xclip,
         })

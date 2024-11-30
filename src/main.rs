@@ -42,6 +42,7 @@ async fn main() -> anyhow::Result<()> {
         model,
         system_message,
         xclip,
+        min_history_tokens,
         max_history_tokens,
     } = Configuration::init(Args::parse())?;
 
@@ -52,6 +53,7 @@ async fn main() -> anyhow::Result<()> {
             api_version,
             model,
             system_message,
+            min_history_tokens,
             max_history_tokens,
         },
     )
