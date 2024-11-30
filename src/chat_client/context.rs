@@ -113,7 +113,7 @@ impl Context {
             .rev()
             .map(|transaction| num_tokens(&transaction.0) + num_tokens(&transaction.1))
             .accumulate((0, system_tokens), |(_, acc), x| (acc, acc + x))
-            .map_while(|(prev, current)| (prev <= min_tokens).then_some(current))
+            .map_while(|(prev, current)| (prev < min_tokens).then_some(current))
             .take_while(|current| *current <= max_tokens)
             .count();
 
@@ -186,5 +186,123 @@ mod tests {
                 UserMessage::new(String::from("req2")).into(),
             ]
         );
+    }
+
+    #[test]
+    fn min_history_tokens() {
+        let tokenizer = tiktoken_rs::o200k_base().unwrap();
+        let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
+        let system = "to to to to to".to_string();
+        let request = "do do do do do".to_string();
+        let response = "be be be be be".to_string();
+        assert_eq!(num_tokens(&system), 5);
+        assert_eq!(num_tokens(&request), 5);
+        assert_eq!(num_tokens(&response), 5);
+
+        let mut context = Context::new_with_rolling_window(
+            Some(system.to_string()),
+            tokenizer.clone(),
+            Some(20),
+            None,
+        );
+        assert!(context.conversation.is_empty());
+
+        // 15 tokens
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 1);
+
+        // 25 tokens
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 2);
+
+        // 25 tokens again: one transaction was discarded
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 2);
+    }
+
+    #[test]
+    fn min_history_tokens_exact() {
+        let tokenizer = tiktoken_rs::o200k_base().unwrap();
+        let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
+        let request = "do do do do do".to_string();
+        let response = "be be be be be".to_string();
+        assert_eq!(num_tokens(&request), 5);
+        assert_eq!(num_tokens(&response), 5);
+
+        let mut context = Context::new_with_rolling_window(None, tokenizer.clone(), Some(20), None);
+        assert!(context.conversation.is_empty());
+
+        // 10 tokens
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 1);
+
+        // 20 tokens
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 2);
+
+        // 20 tokens again: one transaction was discarded
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 2);
+    }
+
+    #[test]
+    fn max_history_tokens() {
+        let tokenizer = tiktoken_rs::o200k_base().unwrap();
+        let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
+        let system = "to to to to to".to_string();
+        let request = "do do do do do".to_string();
+        let response = "be be be be be".to_string();
+        assert_eq!(num_tokens(&system), 5);
+        assert_eq!(num_tokens(&request), 5);
+        assert_eq!(num_tokens(&response), 5);
+
+        let mut context = Context::new_with_rolling_window(
+            Some(system.to_string()),
+            tokenizer.clone(),
+            None,
+            Some(30),
+        );
+        assert!(context.conversation.is_empty());
+
+        // 15 tokens
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 1);
+
+        // 25 tokens
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 2);
+
+        // 25 tokens again: one transaction was discarded
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 2);
+    }
+
+    #[test]
+    fn max_history_tokens_exact() {
+        let tokenizer = tiktoken_rs::o200k_base().unwrap();
+        let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
+        let request = "do do do do do".to_string();
+        let response = "be be be be be".to_string();
+        assert_eq!(num_tokens(&request), 5);
+        assert_eq!(num_tokens(&response), 5);
+
+        let mut context = Context::new_with_rolling_window(None, tokenizer.clone(), None, Some(30));
+        assert!(context.conversation.is_empty());
+
+        // 10 tokens
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 1);
+
+        // 20 tokens
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 2);
+
+        // 30 tokens
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 3);
+
+        // 30 tokens again: one transaction was discarded
+        context.push(request.clone(), response.clone());
+        assert_eq!(context.conversation.len(), 3);
     }
 }
