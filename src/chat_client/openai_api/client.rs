@@ -141,7 +141,7 @@ fn build_url(base_url: String, api_version: Option<String>) -> String {
 pub enum Error {
     /// Invalid API key charcters.
     #[error("Non ASCII / non visible characters in API key")]
-    InvalidCharacersInApiKey(#[from] InvalidHeaderValue),
+    InvalidCharactersInApiKey(#[from] InvalidHeaderValue),
 
     /// Reqwest error.
     #[error("Request error: {0}")]
