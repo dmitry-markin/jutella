@@ -62,6 +62,10 @@ pub struct Args {
     #[arg(short, long)]
     xclip: bool,
 
+    /// Show number of tokens used while generating the response.
+    #[arg(short = 'g', long)]
+    show_token_usage: bool,
+
     /// Keep at least that many tokens in the conversation context.
     ///
     /// The context will be truncated to keep at least `min_history_tokens`, but
@@ -94,6 +98,7 @@ struct ConfigFile {
     min_history_tokens: Option<usize>,
     max_history_tokens: Option<usize>,
     xclip: Option<bool>,
+    show_token_usage: Option<bool>,
 }
 
 pub struct Configuration {
@@ -105,6 +110,7 @@ pub struct Configuration {
     pub min_history_tokens: Option<usize>,
     pub max_history_tokens: Option<usize>,
     pub xclip: bool,
+    pub show_token_usage: bool,
 }
 
 impl Configuration {
@@ -118,6 +124,7 @@ impl Configuration {
             max_history_tokens,
             config,
             xclip,
+            show_token_usage,
         } = args;
 
         let config_path = config.ok_or(()).or_else(|()| {
@@ -167,11 +174,8 @@ impl Configuration {
         let min_history_tokens = min_history_tokens.or(config.min_history_tokens);
         let max_history_tokens = max_history_tokens.or(config.max_history_tokens);
 
-        let xclip = if xclip {
-            true
-        } else {
-            config.xclip.unwrap_or_default()
-        };
+        let xclip = xclip || config.xclip.unwrap_or_default();
+        let show_token_usage = show_token_usage || config.show_token_usage.unwrap_or_default();
 
         Ok(Self {
             api_url,
@@ -182,6 +186,7 @@ impl Configuration {
             min_history_tokens,
             max_history_tokens,
             xclip,
+            show_token_usage,
         })
     }
 }
