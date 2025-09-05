@@ -84,12 +84,12 @@ pub struct Completion {
     pub response: String,
     /// Input tokens used.
     pub tokens_in: usize,
-    /// Cached input tokens.
-    pub tokens_in_cached: usize,
+    /// Cached input tokens, if returned by the API.
+    pub tokens_in_cached: Option<usize>,
     /// Output tokens used.
     pub tokens_out: usize,
-    /// Reasoning tokens used.
-    pub tokens_reasoning: usize,
+    /// Reasoning tokens used, if returned by the API.
+    pub tokens_reasoning: Option<usize>,
 }
 
 /// Errors during interaction with a chatbot.
@@ -225,9 +225,17 @@ impl ChatClient {
         Ok(Completion {
             response,
             tokens_in: completion.usage.prompt_tokens,
-            tokens_in_cached: completion.usage.prompt_tokens_details.cached_tokens,
+            tokens_in_cached: completion
+                .usage
+                .prompt_tokens_details
+                .map(|d| d.cached_tokens)
+                .flatten(),
             tokens_out: completion.usage.completion_tokens,
-            tokens_reasoning: completion.usage.completion_tokens_details.reasoning_tokens,
+            tokens_reasoning: completion
+                .usage
+                .completion_tokens_details
+                .map(|d| d.reasoning_tokens)
+                .flatten(),
         })
     }
 
