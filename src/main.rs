@@ -42,8 +42,11 @@ async fn main() -> anyhow::Result<()> {
         model,
         system_message,
         xclip,
+        show_token_usage,
         min_history_tokens,
         max_history_tokens,
+        reasoning_effort,
+        verbosity,
     } = Configuration::init(Args::parse())?;
 
     let mut chat = ChatClient::new(
@@ -55,6 +58,8 @@ async fn main() -> anyhow::Result<()> {
             system_message,
             min_history_tokens,
             max_history_tokens,
+            reasoning_effort,
+            verbosity,
         },
     )
     .context("Failed to initialize the client")?;
@@ -62,13 +67,28 @@ async fn main() -> anyhow::Result<()> {
     print_prompt()?;
 
     for line in io::stdin().lines() {
-        if let Ok(response) = chat.ask(line?).await.inspect_err(|e| print_error(e)) {
-            print_response(&response);
+        if let Ok(completion) = chat
+            .request_completion(line?)
+            .await
+            .inspect_err(|e| print_error(e))
+        {
+            print_response(&completion.response);
 
             if xclip {
-                copy_to_clipboard(response)
+                copy_to_clipboard(completion.response)
                     .inspect_err(|e| print_error(e))
                     .unwrap_or_default();
+            }
+
+            if show_token_usage {
+                let tokens_info = format!(
+                    "{} ({}) / {} ({})",
+                    completion.tokens_in,
+                    completion.tokens_in_cached,
+                    completion.tokens_out,
+                    completion.tokens_reasoning,
+                );
+                println!("{}\n", tokens_info.blue());
             }
         }
 
