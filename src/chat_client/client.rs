@@ -52,6 +52,14 @@ pub struct ChatClientConfig {
     pub min_history_tokens: Option<usize>,
     /// Max history tokens to keep in the conversation context.
     pub max_history_tokens: Option<usize>,
+    /// Reasoning effort. Passed as is to the API.
+    ///
+    /// Typical values are: `minimal`, `low`, `medium`, and `high`.
+    pub reasoning_effort: Option<String>,
+    /// Verbosity of the answers. Passed as is to the API.
+    ///
+    /// Typical values are: `low`, `medium`, and `high`.
+    pub verbosity: Option<String>,
 }
 
 impl Default for ChatClientConfig {
@@ -63,6 +71,8 @@ impl Default for ChatClientConfig {
             system_message: None,
             min_history_tokens: None,
             max_history_tokens: None,
+            reasoning_effort: None,
+            verbosity: None,
         }
     }
 }
@@ -108,10 +118,18 @@ pub enum Error {
     TokenizerInit(String),
 }
 
+/// Model configuration.
+#[derive(Debug, Clone)]
+pub struct ModelConfig {
+    pub model: String,
+    pub reasoning_effort: Option<String>,
+    pub verbosity: Option<String>,
+}
+
 /// Chatbot API client.
 pub struct ChatClient {
     client: OpenAiClient,
-    model: String,
+    model_config: ModelConfig,
     context: Context,
 }
 
@@ -125,6 +143,8 @@ impl ChatClient {
             system_message,
             min_history_tokens,
             max_history_tokens,
+            reasoning_effort,
+            verbosity,
         } = config;
 
         let api_url = ensure_trailing_slash(api_url);
@@ -132,7 +152,11 @@ impl ChatClient {
 
         Ok(Self {
             client: OpenAiClient::new(auth, api_url, api_version)?,
-            model,
+            model_config: ModelConfig {
+                model,
+                reasoning_effort,
+                verbosity,
+            },
             context,
         })
     }
@@ -152,6 +176,8 @@ impl ChatClient {
             system_message,
             min_history_tokens,
             max_history_tokens,
+            reasoning_effort,
+            verbosity,
         } = config;
 
         let api_url = ensure_trailing_slash(api_url);
@@ -159,7 +185,11 @@ impl ChatClient {
 
         Ok(Self {
             client: OpenAiClient::new_with_client(client, api_url, api_version),
-            model,
+            model_config: ModelConfig {
+                model,
+                reasoning_effort,
+                verbosity,
+            },
             context,
         })
     }
@@ -174,7 +204,7 @@ impl ChatClient {
         let mut completion = self
             .client
             .chat_completions(Self::body(
-                self.model.clone(),
+                self.model_config.clone(),
                 &self.context,
                 request.clone(),
             ))
@@ -202,10 +232,20 @@ impl ChatClient {
     }
 
     /// Construct a request body.
-    fn body(model: String, context: &Context, request: String) -> ChatCompletionsBody {
+    fn body(
+        ModelConfig {
+            model,
+            reasoning_effort,
+            verbosity,
+        }: ModelConfig,
+        context: &Context,
+        request: String,
+    ) -> ChatCompletionsBody {
         ChatCompletionsBody {
             model,
             messages: context.with_request(request).map(Into::into).collect(),
+            reasoning_effort,
+            verbosity,
             ..Default::default()
         }
     }

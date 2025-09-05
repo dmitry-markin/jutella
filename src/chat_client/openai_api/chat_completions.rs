@@ -230,12 +230,16 @@ pub struct ChatCompletionsBody {
     /// Constrains effort on reasoning for reasoning models. Currently supported values are
     /// `minimal`, `low`, `medium`, and `high`. Reducing reasoning effort can result in faster
     /// responses and fewer tokens used on reasoning in a response.
+    ///
+    /// Defaults to `medium`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_effort: Option<String>,
 
     /// Constrains the verbosity of the model's response. Lower values will result in more concise
     /// responses, while higher values will result in more verbose responses. Currently supported
     /// values are `low`, `medium`, and `high`.
+    ///
+    /// Defaults to `medium`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verbosity: Option<String>,
 
