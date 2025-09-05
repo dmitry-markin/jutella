@@ -25,19 +25,39 @@
 use crate::chat_client::{
     context::Context,
     openai_api::{
-        chat_completions::ChatCompletionsBody,
+        chat_completions::{ChatCompletionsBody, OpenRouterReasoning},
         client::{Auth, Error as OpenAiClientError, OpenAiClient},
         message::{self, AssistantMessage},
     },
 };
 
-use super::openai_api::chat_completions::OpenrouterReasoning;
+/// API to use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiType {
+    /// OpenAI API.
+    OpenAi,
+    /// OpenRouter API.
+    OpenRouter,
+}
+
+impl ApiType {
+    /// Check if the API type is OpenAI.
+    pub fn is_openai(&self) -> bool {
+        matches!(self, ApiType::OpenAi)
+    }
+    /// Check if the API type is OpenRouter.
+    pub fn is_openrouter(&self) -> bool {
+        matches!(self, ApiType::OpenRouter)
+    }
+}
 
 /// Configuration for [`ChatClient`].
 #[derive(Debug)]
 pub struct ChatClientConfig {
     /// OpenAI chat API endpoint.
     pub api_url: String,
+    /// API type.
+    pub api_type: ApiType,
     /// API version.
     pub api_version: Option<String>,
     /// Model.
@@ -68,6 +88,7 @@ impl Default for ChatClientConfig {
     fn default() -> Self {
         Self {
             api_url: String::from("https://api.openai.com/v1/"),
+            api_type: ApiType::OpenAi,
             api_version: None,
             model: String::from("gpt-4o-mini"),
             system_message: None,
@@ -124,6 +145,7 @@ pub enum Error {
 #[derive(Debug, Clone)]
 pub struct ModelConfig {
     pub model: String,
+    pub api_type: ApiType,
     pub reasoning_effort: Option<String>,
     pub verbosity: Option<String>,
 }
@@ -140,6 +162,7 @@ impl ChatClient {
     pub fn new(auth: Auth, config: ChatClientConfig) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
+            api_type,
             api_version,
             model,
             system_message,
@@ -156,6 +179,7 @@ impl ChatClient {
             client: OpenAiClient::new(auth, api_url, api_version)?,
             model_config: ModelConfig {
                 model,
+                api_type,
                 reasoning_effort,
                 verbosity,
             },
@@ -173,6 +197,7 @@ impl ChatClient {
     ) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
+            api_type,
             api_version,
             model,
             system_message,
@@ -189,6 +214,7 @@ impl ChatClient {
             client: OpenAiClient::new_with_client(client, api_url, api_version),
             model_config: ModelConfig {
                 model,
+                api_type,
                 reasoning_effort,
                 verbosity,
             },
@@ -245,6 +271,7 @@ impl ChatClient {
     fn body(
         ModelConfig {
             model,
+            api_type,
             reasoning_effort,
             verbosity,
         }: ModelConfig,
@@ -254,11 +281,14 @@ impl ChatClient {
         ChatCompletionsBody {
             model,
             messages: context.with_request(request).map(Into::into).collect(),
-            // Let's hope OpenAI will not complain on OpenRouter-specific field.
-            reasoning: reasoning_effort
-                .as_ref()
-                .map(|s| OpenrouterReasoning::new(s.clone())),
-            reasoning_effort,
+            reasoning_effort: api_type
+                .is_openai()
+                .then(|| reasoning_effort.clone())
+                .flatten(),
+            reasoning: api_type
+                .is_openrouter()
+                .then(|| reasoning_effort.map(|s| OpenRouterReasoning::new(s)))
+                .flatten(),
             verbosity,
             ..Default::default()
         }

@@ -250,12 +250,12 @@ pub struct ChatCompletionsBody {
     // OpenRouter specific fields.
     /// Configuration for model reasoning/thinking tokens
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<OpenrouterReasoning>,
+    pub reasoning: Option<OpenRouterReasoning>,
 }
 
 /// OpenRouter reasoning settings.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
-pub struct OpenrouterReasoning {
+pub struct OpenRouterReasoning {
     /// OpenAI-style reasoning effort settings.
     ///
     /// Allowed values: `high`, `medium`, `low`.
@@ -269,7 +269,7 @@ pub struct OpenrouterReasoning {
     pub exclude: bool,
 }
 
-impl OpenrouterReasoning {
+impl OpenRouterReasoning {
     /// Create new OpenRouter reasoning settings using string effort value.
     pub fn new(effort: String) -> Self {
         Self {

@@ -37,6 +37,7 @@ use std::{
 async fn main() -> anyhow::Result<()> {
     let Configuration {
         auth,
+        api_type,
         api_version,
         api_url,
         model,
@@ -53,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
         auth,
         ChatClientConfig {
             api_url,
+            api_type,
             api_version,
             model,
             system_message,
