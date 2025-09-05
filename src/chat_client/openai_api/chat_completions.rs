@@ -246,6 +246,38 @@ pub struct ChatCompletionsBody {
     /// This tool searches the web for relevant results to use in a response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub web_search_options: Option<Value>,
+
+    // OpenRouter specific fields.
+    /// Configuration for model reasoning/thinking tokens
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<OpenrouterReasoning>,
+}
+
+/// OpenRouter reasoning settings.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+pub struct OpenrouterReasoning {
+    /// OpenAI-style reasoning effort settings.
+    ///
+    /// Allowed values: `high`, `medium`, `low`.
+    pub effort: Option<String>,
+
+    /// Non-OpenAI-style reasoning effort setting. Cannot be used simultaneously with effort.
+    pub max_tokens: Option<usize>,
+
+    /// Whether to exclude reasoning from the response.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub exclude: bool,
+}
+
+impl OpenrouterReasoning {
+    /// Create new OpenRouter reasoning settings using string effort value.
+    pub fn new(effort: String) -> Self {
+        Self {
+            effort: Some(effort),
+            max_tokens: None,
+            exclude: false,
+        }
+    }
 }
 
 /// OpenAI API Chat Completions response.

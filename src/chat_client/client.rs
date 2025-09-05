@@ -31,6 +31,8 @@ use crate::chat_client::{
     },
 };
 
+use super::openai_api::chat_completions::OpenrouterReasoning;
+
 /// Configuration for [`ChatClient`].
 #[derive(Debug)]
 pub struct ChatClientConfig {
@@ -252,6 +254,10 @@ impl ChatClient {
         ChatCompletionsBody {
             model,
             messages: context.with_request(request).map(Into::into).collect(),
+            // Let's hope OpenAI will not complain on OpenRouter-specific field.
+            reasoning: reasoning_effort
+                .as_ref()
+                .map(|s| OpenrouterReasoning::new(s.clone())),
             reasoning_effort,
             verbosity,
             ..Default::default()
