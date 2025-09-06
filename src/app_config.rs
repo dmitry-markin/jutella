@@ -77,6 +77,7 @@ pub struct Args {
     model: Option<String>,
 
     /// Optional system message to initialize the model. Example: "You are a helpful assistant."
+    /// Empty string disables the system message.
     #[arg(short, long)]
     system_message: Option<String>,
 
@@ -89,6 +90,7 @@ pub struct Args {
     xclip: bool,
 
     /// Show number of tokens used while generating the response.
+    /// Format: input tokens (cached input tokens) / output tokens (reasoning tokens)
     #[arg(short = 'g', long)]
     show_token_usage: bool,
 
@@ -219,7 +221,11 @@ impl Configuration {
             .or(config.model)
             .unwrap_or_else(|| String::from(DEFAULT_MODEL));
 
-        let system_message = system_message.or(config.system_message);
+        let system_message = match system_message {
+            Some(msg) if msg.is_empty() => None,
+            Some(msg) => Some(msg),
+            None => config.system_message,
+        };
 
         let min_history_tokens = min_history_tokens.or(config.min_history_tokens);
         let max_history_tokens = max_history_tokens.or(config.max_history_tokens);
