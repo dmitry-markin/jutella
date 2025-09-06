@@ -35,7 +35,7 @@ const DEFAULT_MODEL: &str = "gpt-4o-mini";
 /// API to use.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ApiType {
-    /// OpenAI API.
+    /// OpenAI API (including Azure).
     #[clap(name = "openai")]
     OpenAi,
     /// OpenRouter API.
@@ -54,20 +54,22 @@ impl From<ApiType> for jutella::ApiType {
 
 #[derive(Debug, Parser)]
 #[command(version)]
-#[command(about = "Chatbot API CLI. Currently supports OpenAI chat API.", long_about = None)]
+#[command(about = "Chatbot API CLI. Supports OpenAI chat completions API, \
+                   including OpenAI, Azure, and OpenRouter flavors.",
+          long_about = None)]
 #[command(after_help = "You can only set API key/token in the config. \
                         Command line options override the ones in the config.")]
 pub struct Args {
-    /// API type. Default: openai.
-    #[arg(short = 'i', long, value_enum)]
+    /// API flavor. Default: openai.
+    #[arg(short, long, value_enum)]
     api: Option<ApiType>,
 
     /// Base API url. Default: "https://api.openai.com/v1/".
     #[arg(short = 'u', long)]
     api_url: Option<String>,
 
-    /// API version.
-    #[arg(short, long)]
+    /// API version GET parameter used by Azure.
+    #[arg(long)]
     api_version: Option<String>,
 
     /// Model. Default: "gpt-4o-mini". You likely need to include the version date.

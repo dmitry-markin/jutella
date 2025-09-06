@@ -1,4 +1,4 @@
-# API type. Either `openai` or `openrouter`.
+# API flavor. Either `openai` or `openrouter`.
 #api = "openai"
 
 # OpenAI API base URL. Everything before `chat/completions` in the URL.

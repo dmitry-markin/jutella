@@ -119,7 +119,7 @@ pub struct Completion {
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Error reported by the model API.
-    #[error("OpenAI API client error: {0}")]
+    #[error("API error: {0}")]
     OpenAiClient(#[from] OpenAiClientError),
     /// The response contains no completion choices.
     #[error("Response contains no choices")]
