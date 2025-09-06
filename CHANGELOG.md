@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-09-06
+
+This relase adds support for [OpenRouter](https://openrouter.ai/) API, exposes options for `reasonning_effort` and response `verbosity`, extends token usage reporting, and adds token usage display to the CLI client.
+
+### Added
+
+- Allow disabling system message via CLI ([#12](https://github.com/dmitry-markin/jutella/pull/12))
+- Support OpenRouter API ([#11](https://github.com/dmitry-markin/jutella/pull/11))
+- Allow setting `reasoning_effort` & `verbosity` and return detailed token usage ([#10](https://github.com/dmitry-markin/jutella/pull/10))
+
+### Changed
+
+- Increase HTTP timeout from 2 min to 5 min ([#14](https://github.com/dmitry-markin/jutella/pull/14))
+- Bump dependencies ([#13](https://github.com/dmitry-markin/jutella/pull/13))
+
+### Fixed
+
+- Fix error on null `system_fingerprint` with `gpt-4.5-preview` ([commit](https://github.com/dmitry-markin/jutella/commit/44f241c1c108effe79340bcab5b4f2ba99834662))
+
 ## [0.4.0] - 2024-11-30
 
 This release adds `min_history_tokens` context window rolling strategy. It can be handy to keep the last big response in the context. Additionally, the API now provides token usage info.
