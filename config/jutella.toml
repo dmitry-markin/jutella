@@ -43,5 +43,6 @@ max_history_tokens = 2500
 # Copy every response to clipboard via `xclip`.
 xclip = false
 
-# Display token usage after each response.
+# Display token usage after each response. The information is displayed in the following format:
+# input tokens (cached input tokens) / output tokens (reasoning tokens)
 show_token_usage = false
