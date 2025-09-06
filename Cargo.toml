@@ -7,18 +7,18 @@ version = "0.4.0"
 edition = "2021"
 
 [dependencies]
-anyhow = { version = "1.0.89", optional = true }
-clap = { version = "4.5.17", features = ["derive", "wrap_help"], optional = true }
-colored = { version = "2.1.0", optional = true }
-dirs = { version = "5.0.1", optional = true }
+anyhow = { version = "1.0.99", optional = true }
+clap = { version = "4.5.47", features = ["derive", "wrap_help"], optional = true }
+colored = { version = "3.0.0", optional = true }
+dirs = { version = "6.0.0", optional = true }
 iter_accumulate = "1.0.0"
-reqwest = { version = "0.12.7", default-features = false, features = ["gzip", "json", "hickory-dns", "http2", "rustls-tls", "zstd" ] }
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = "1.0.128"
-thiserror = "1.0.63"
-tiktoken-rs = "0.5.9"
-tokio = { version = "1.40.0", features = ["rt-multi-thread", "macros"] }
-toml = { version = "0.8.19", optional = true }
+reqwest = { version = "0.12.23", default-features = false, features = ["gzip", "json", "hickory-dns", "http2", "rustls-tls", "zstd" ] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.143"
+thiserror = "2.0.16"
+tiktoken-rs = "0.7.0"
+tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
+toml = { version = "0.9.5", optional = true }
 
 [features]
 default = ["bin"]
