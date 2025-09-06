@@ -256,14 +256,12 @@ impl ChatClient {
             tokens_in_cached: completion
                 .usage
                 .prompt_tokens_details
-                .map(|d| d.cached_tokens)
-                .flatten(),
+                .and_then(|d| d.cached_tokens),
             tokens_out: completion.usage.completion_tokens,
             tokens_reasoning: completion
                 .usage
                 .completion_tokens_details
-                .map(|d| d.reasoning_tokens)
-                .flatten(),
+                .and_then(|d| d.reasoning_tokens),
         })
     }
 
@@ -287,7 +285,7 @@ impl ChatClient {
                 .flatten(),
             reasoning: api_type
                 .is_openrouter()
-                .then(|| reasoning_effort.map(|s| OpenRouterReasoning::new(s)))
+                .then(|| reasoning_effort.map(OpenRouterReasoning::new))
                 .flatten(),
             verbosity,
             ..Default::default()
