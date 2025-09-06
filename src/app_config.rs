@@ -208,9 +208,9 @@ impl Configuration {
 
         let config_api_type = config
             .api
-            .map(|api| ApiType::from_str(&api, true))
+            .map(|api| ApiType::from_str(&api, false))
             .transpose()
-            .map_err(|e| anyhow!("Invalid API type in config: {}", e))?;
+            .map_err(|e| anyhow!("Invalid API flavor in config: {}", e))?;
         let api_type = api.or(config_api_type).unwrap_or(ApiType::OpenAi);
 
         let api_version = api_version.or(config.api_version);
