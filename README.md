@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/dmitry-markin/jutella/blob/master/LICENSE) [![crates.io](https://img.shields.io/crates/v/jutella.svg)](https://crates.io/crates/jutella) [![docs.rs](https://img.shields.io/docsrs/jutella.svg)](https://docs.rs/jutella/latest/jutella/)
 
-Chatbot API client library and CLI interface. Currently supports OpenAI chat API, including OpenAI and Azure endpoints.
+Chatbot API client library and CLI interface. Supports OpenAI chat completions API, including OpenAI, Azure, and OpenRouter flavors.
 
 
 ## Command line interface

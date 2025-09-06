@@ -169,6 +169,11 @@ pub struct GenericMessage {
     /// Tool call that this message is responding to.
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_call_id: Option<String>,
+
+    // OpenRouter specific fileds.
+    /// Reasoning performaed by model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning: Option<String>,
 }
 
 impl From<Message> for GenericMessage {
@@ -191,6 +196,7 @@ impl From<SystemMessage> for GenericMessage {
             refusal: None,
             tool_calls: None,
             tool_call_id: None,
+            reasoning: None,
         }
     }
 }
@@ -204,6 +210,7 @@ impl From<UserMessage> for GenericMessage {
             refusal: None,
             tool_calls: None,
             tool_call_id: None,
+            reasoning: None,
         }
     }
 }
@@ -224,6 +231,7 @@ impl From<AssistantMessage> for GenericMessage {
             refusal,
             tool_calls,
             tool_call_id: None,
+            reasoning: None,
         }
     }
 }
@@ -242,6 +250,7 @@ impl From<ToolMessage> for GenericMessage {
             refusal: None,
             tool_calls: None,
             tool_call_id: Some(tool_call_id),
+            reasoning: None,
         }
     }
 }

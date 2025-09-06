@@ -1,3 +1,6 @@
+# API flavor. Either `openai` or `openrouter`.
+#api = "openai"
+
 # OpenAI API base URL. Everything before `chat/completions` in the URL.
 api_url = "https://api.openai.com/v1/"
 

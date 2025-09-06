@@ -37,6 +37,7 @@ use std::{
 async fn main() -> anyhow::Result<()> {
     let Configuration {
         auth,
+        api_type,
         api_version,
         api_url,
         model,
@@ -53,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
         auth,
         ChatClientConfig {
             api_url,
+            api_type,
             api_version,
             model,
             system_message,
@@ -84,9 +86,9 @@ async fn main() -> anyhow::Result<()> {
                 let tokens_info = format!(
                     "{} ({}) / {} ({})",
                     completion.tokens_in,
-                    completion.tokens_in_cached,
+                    completion.tokens_in_cached.unwrap_or_default(),
                     completion.tokens_out,
-                    completion.tokens_reasoning,
+                    completion.tokens_reasoning.unwrap_or_default(),
                 );
                 println!("{}\n", tokens_info.blue());
             }

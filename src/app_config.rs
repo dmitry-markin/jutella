@@ -23,7 +23,7 @@
 //! `jutella` CLI interface configuration.
 
 use anyhow::{anyhow, Context as _};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use dirs::home_dir;
 use jutella::Auth;
 use std::{fs, path::PathBuf};
@@ -32,18 +32,44 @@ const HOME_CONFIG_LOCATION: &str = ".config/jutella.toml";
 const DEFAULT_ENDPOINT: &str = "https://api.openai.com/v1/";
 const DEFAULT_MODEL: &str = "gpt-4o-mini";
 
+/// API to use.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum ApiType {
+    /// OpenAI API (including Azure).
+    #[clap(name = "openai")]
+    OpenAi,
+    /// OpenRouter API.
+    #[clap(name = "openrouter")]
+    OpenRouter,
+}
+
+impl From<ApiType> for jutella::ApiType {
+    fn from(value: ApiType) -> Self {
+        match value {
+            ApiType::OpenAi => jutella::ApiType::OpenAi,
+            ApiType::OpenRouter => jutella::ApiType::OpenRouter,
+        }
+    }
+}
+
 #[derive(Debug, Parser)]
 #[command(version)]
-#[command(about = "Chatbot API CLI. Currently supports OpenAI chat API.", long_about = None)]
+#[command(about = "Chatbot API CLI. Supports OpenAI chat completions API, \
+                   including OpenAI, Azure, and OpenRouter flavors.",
+          long_about = None)]
 #[command(after_help = "You can only set API key/token in the config. \
                         Command line options override the ones in the config.")]
 pub struct Args {
+    /// API flavor. Default: openai.
+    #[arg(short, long, value_enum)]
+    api: Option<ApiType>,
+
     /// Base API url. Default: "https://api.openai.com/v1/".
     #[arg(short = 'u', long)]
     api_url: Option<String>,
 
-    /// API version.
-    #[arg(short, long)]
+    /// API version GET parameter used by Azure.
+    #[arg(long)]
     api_version: Option<String>,
 
     /// Model. Default: "gpt-4o-mini". You likely need to include the version date.
@@ -98,6 +124,7 @@ impl Args {
 #[derive(Debug, serde::Deserialize)]
 struct ConfigFile {
     api_url: Option<String>,
+    api: Option<String>,
     api_version: Option<String>,
     api_key: Option<String>,
     api_token: Option<String>,
@@ -113,6 +140,7 @@ struct ConfigFile {
 
 pub struct Configuration {
     pub api_url: String,
+    pub api_type: jutella::ApiType,
     pub api_version: Option<String>,
     pub auth: Auth,
     pub model: String,
@@ -129,6 +157,7 @@ impl Configuration {
     pub fn init(args: Args) -> anyhow::Result<Self> {
         let Args {
             api_url,
+            api,
             api_version,
             model,
             system_message,
@@ -177,6 +206,13 @@ impl Configuration {
             .or(config.api_url)
             .unwrap_or_else(|| String::from(DEFAULT_ENDPOINT));
 
+        let config_api_type = config
+            .api
+            .map(|api| ApiType::from_str(&api, false))
+            .transpose()
+            .map_err(|e| anyhow!("Invalid API flavor in config: {}", e))?;
+        let api_type = api.or(config_api_type).unwrap_or(ApiType::OpenAi);
+
         let api_version = api_version.or(config.api_version);
 
         let model = model
@@ -196,6 +232,7 @@ impl Configuration {
 
         Ok(Self {
             api_url,
+            api_type: api_type.into(),
             api_version,
             auth,
             model,

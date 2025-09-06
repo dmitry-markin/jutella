@@ -25,17 +25,39 @@
 use crate::chat_client::{
     context::Context,
     openai_api::{
-        chat_completions::ChatCompletionsBody,
+        chat_completions::{ChatCompletionsBody, OpenRouterReasoning},
         client::{Auth, Error as OpenAiClientError, OpenAiClient},
         message::{self, AssistantMessage},
     },
 };
+
+/// API to use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiType {
+    /// OpenAI API.
+    OpenAi,
+    /// OpenRouter API.
+    OpenRouter,
+}
+
+impl ApiType {
+    /// Check if the API type is OpenAI.
+    pub fn is_openai(&self) -> bool {
+        matches!(self, ApiType::OpenAi)
+    }
+    /// Check if the API type is OpenRouter.
+    pub fn is_openrouter(&self) -> bool {
+        matches!(self, ApiType::OpenRouter)
+    }
+}
 
 /// Configuration for [`ChatClient`].
 #[derive(Debug)]
 pub struct ChatClientConfig {
     /// OpenAI chat API endpoint.
     pub api_url: String,
+    /// API type.
+    pub api_type: ApiType,
     /// API version.
     pub api_version: Option<String>,
     /// Model.
@@ -66,6 +88,7 @@ impl Default for ChatClientConfig {
     fn default() -> Self {
         Self {
             api_url: String::from("https://api.openai.com/v1/"),
+            api_type: ApiType::OpenAi,
             api_version: None,
             model: String::from("gpt-4o-mini"),
             system_message: None,
@@ -84,19 +107,19 @@ pub struct Completion {
     pub response: String,
     /// Input tokens used.
     pub tokens_in: usize,
-    /// Cached input tokens.
-    pub tokens_in_cached: usize,
+    /// Cached input tokens, if returned by the API.
+    pub tokens_in_cached: Option<usize>,
     /// Output tokens used.
     pub tokens_out: usize,
-    /// Reasoning tokens used.
-    pub tokens_reasoning: usize,
+    /// Reasoning tokens used, if returned by the API.
+    pub tokens_reasoning: Option<usize>,
 }
 
 /// Errors during interaction with a chatbot.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Error reported by the model API.
-    #[error("OpenAI API client error: {0}")]
+    #[error("API error: {0}")]
     OpenAiClient(#[from] OpenAiClientError),
     /// The response contains no completion choices.
     #[error("Response contains no choices")]
@@ -122,6 +145,7 @@ pub enum Error {
 #[derive(Debug, Clone)]
 pub struct ModelConfig {
     pub model: String,
+    pub api_type: ApiType,
     pub reasoning_effort: Option<String>,
     pub verbosity: Option<String>,
 }
@@ -138,6 +162,7 @@ impl ChatClient {
     pub fn new(auth: Auth, config: ChatClientConfig) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
+            api_type,
             api_version,
             model,
             system_message,
@@ -154,6 +179,7 @@ impl ChatClient {
             client: OpenAiClient::new(auth, api_url, api_version)?,
             model_config: ModelConfig {
                 model,
+                api_type,
                 reasoning_effort,
                 verbosity,
             },
@@ -171,6 +197,7 @@ impl ChatClient {
     ) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
+            api_type,
             api_version,
             model,
             system_message,
@@ -187,6 +214,7 @@ impl ChatClient {
             client: OpenAiClient::new_with_client(client, api_url, api_version),
             model_config: ModelConfig {
                 model,
+                api_type,
                 reasoning_effort,
                 verbosity,
             },
@@ -225,9 +253,15 @@ impl ChatClient {
         Ok(Completion {
             response,
             tokens_in: completion.usage.prompt_tokens,
-            tokens_in_cached: completion.usage.prompt_tokens_details.cached_tokens,
+            tokens_in_cached: completion
+                .usage
+                .prompt_tokens_details
+                .and_then(|d| d.cached_tokens),
             tokens_out: completion.usage.completion_tokens,
-            tokens_reasoning: completion.usage.completion_tokens_details.reasoning_tokens,
+            tokens_reasoning: completion
+                .usage
+                .completion_tokens_details
+                .and_then(|d| d.reasoning_tokens),
         })
     }
 
@@ -235,6 +269,7 @@ impl ChatClient {
     fn body(
         ModelConfig {
             model,
+            api_type,
             reasoning_effort,
             verbosity,
         }: ModelConfig,
@@ -244,7 +279,14 @@ impl ChatClient {
         ChatCompletionsBody {
             model,
             messages: context.with_request(request).map(Into::into).collect(),
-            reasoning_effort,
+            reasoning_effort: api_type
+                .is_openai()
+                .then(|| reasoning_effort.clone())
+                .flatten(),
+            reasoning: api_type
+                .is_openrouter()
+                .then(|| reasoning_effort.map(OpenRouterReasoning::new))
+                .flatten(),
             verbosity,
             ..Default::default()
         }
