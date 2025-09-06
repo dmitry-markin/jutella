@@ -28,7 +28,7 @@ use crate::chat_client::openai_api::message::{
 use iter_accumulate::IterAccumulate;
 
 /// Chatbot context.
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct Context {
     system_message: Option<String>,
     conversation: Vec<(String, String)>,
