@@ -262,7 +262,7 @@ pub struct OpenRouterReasoning {
     pub effort: Option<String>,
 
     /// Non-OpenAI-style reasoning effort setting. Cannot be used simultaneously with effort.
-    pub max_tokens: Option<usize>,
+    pub max_tokens: Option<i64>,
 
     /// Whether to exclude reasoning from the response.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
@@ -271,10 +271,19 @@ pub struct OpenRouterReasoning {
 
 impl OpenRouterReasoning {
     /// Create new OpenRouter reasoning settings using string effort value.
-    pub fn new(effort: String) -> Self {
+    pub fn from_effort(effort: String) -> Self {
         Self {
             effort: Some(effort),
             max_tokens: None,
+            exclude: false,
+        }
+    }
+
+    /// Create new OpenRouter reasoning settings using max tokens value.
+    pub fn from_budget(max_tokens: i64) -> Self {
+        Self {
+            effort: None,
+            max_tokens: Some(max_tokens),
             exclude: false,
         }
     }

@@ -31,23 +31,47 @@ use crate::chat_client::{
     },
 };
 
-/// API to use.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ApiType {
-    /// OpenAI API.
-    OpenAi,
-    /// OpenRouter API.
-    OpenRouter,
+/// OpenRouter reasoning settings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReasoningSettings {
+    /// Rasoning effort. Typically one of `minimal`, `low`, `medium`, or `high`.
+    Effort(String),
+    /// Reasoning budget in tokens.
+    Budget(i64),
 }
 
-impl ApiType {
+/// API specific options.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ApiOptions {
+    /// OpenAI API.
+    OpenAi {
+        /// Reasoning effort. Typically one of `minimal`, `low`, `medium`, or `high`.
+        reasoning_effort: Option<String>,
+    },
+    /// OpenRouter API.
+    OpenRouter {
+        /// Reasoning settings.
+        reasoning: Option<ReasoningSettings>,
+    },
+}
+
+impl ApiOptions {
     /// Check if the API type is OpenAI.
-    pub fn is_openai(&self) -> bool {
-        matches!(self, ApiType::OpenAi)
+    pub fn as_openai_reasoning_effort(&self) -> Option<String> {
+        match self {
+            ApiOptions::OpenAi { reasoning_effort } => reasoning_effort.clone(),
+            _ => None,
+        }
     }
     /// Check if the API type is OpenRouter.
-    pub fn is_openrouter(&self) -> bool {
-        matches!(self, ApiType::OpenRouter)
+    pub fn as_openrouter_reasoning_settings(&self) -> Option<OpenRouterReasoning> {
+        match self {
+            ApiOptions::OpenRouter { reasoning } => reasoning.as_ref().map(|r| match r {
+                ReasoningSettings::Effort(e) => OpenRouterReasoning::from_effort(e.clone()),
+                ReasoningSettings::Budget(b) => OpenRouterReasoning::from_budget(*b),
+            }),
+            _ => None,
+        }
     }
 }
 
@@ -57,7 +81,7 @@ pub struct ChatClientConfig {
     /// OpenAI chat API endpoint.
     pub api_url: String,
     /// API type.
-    pub api_type: ApiType,
+    pub api_options: ApiOptions,
     /// API version.
     pub api_version: Option<String>,
     /// Model.
@@ -74,10 +98,6 @@ pub struct ChatClientConfig {
     pub min_history_tokens: Option<usize>,
     /// Max history tokens to keep in the conversation context.
     pub max_history_tokens: Option<usize>,
-    /// Reasoning effort. Passed as is to the API.
-    ///
-    /// Typical values are: `minimal`, `low`, `medium`, and `high`.
-    pub reasoning_effort: Option<String>,
     /// Verbosity of the answers. Passed as is to the API.
     ///
     /// Typical values are: `low`, `medium`, and `high`.
@@ -88,13 +108,14 @@ impl Default for ChatClientConfig {
     fn default() -> Self {
         Self {
             api_url: String::from("https://api.openai.com/v1/"),
-            api_type: ApiType::OpenAi,
+            api_options: ApiOptions::OpenAi {
+                reasoning_effort: None,
+            },
             api_version: None,
             model: String::from("gpt-4o-mini"),
             system_message: None,
             min_history_tokens: None,
             max_history_tokens: None,
-            reasoning_effort: None,
             verbosity: None,
         }
     }
@@ -145,8 +166,7 @@ pub enum Error {
 #[derive(Debug, Clone)]
 pub struct ModelConfig {
     pub model: String,
-    pub api_type: ApiType,
-    pub reasoning_effort: Option<String>,
+    pub api_options: ApiOptions,
     pub verbosity: Option<String>,
 }
 
@@ -162,13 +182,12 @@ impl ChatClient {
     pub fn new(auth: Auth, config: ChatClientConfig) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
-            api_type,
+            api_options,
             api_version,
             model,
             system_message,
             min_history_tokens,
             max_history_tokens,
-            reasoning_effort,
             verbosity,
         } = config;
 
@@ -179,8 +198,7 @@ impl ChatClient {
             client: OpenAiClient::new(auth, api_url, api_version)?,
             model_config: ModelConfig {
                 model,
-                api_type,
-                reasoning_effort,
+                api_options,
                 verbosity,
             },
             context,
@@ -197,13 +215,12 @@ impl ChatClient {
     ) -> Result<Self, Error> {
         let ChatClientConfig {
             api_url,
-            api_type,
+            api_options,
             api_version,
             model,
             system_message,
             min_history_tokens,
             max_history_tokens,
-            reasoning_effort,
             verbosity,
         } = config;
 
@@ -214,8 +231,7 @@ impl ChatClient {
             client: OpenAiClient::new_with_client(client, api_url, api_version),
             model_config: ModelConfig {
                 model,
-                api_type,
-                reasoning_effort,
+                api_options,
                 verbosity,
             },
             context,
@@ -269,8 +285,7 @@ impl ChatClient {
     fn body(
         ModelConfig {
             model,
-            api_type,
-            reasoning_effort,
+            api_options,
             verbosity,
         }: ModelConfig,
         context: &Context,
@@ -279,14 +294,8 @@ impl ChatClient {
         ChatCompletionsBody {
             model,
             messages: context.with_request(request).map(Into::into).collect(),
-            reasoning_effort: api_type
-                .is_openai()
-                .then(|| reasoning_effort.clone())
-                .flatten(),
-            reasoning: api_type
-                .is_openrouter()
-                .then(|| reasoning_effort.map(OpenRouterReasoning::new))
-                .flatten(),
+            reasoning_effort: api_options.as_openai_reasoning_effort(),
+            reasoning: api_options.as_openrouter_reasoning_settings(),
             verbosity,
             ..Default::default()
         }

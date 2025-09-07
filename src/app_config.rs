@@ -43,15 +43,6 @@ pub enum ApiType {
     OpenRouter,
 }
 
-impl From<ApiType> for jutella::ApiType {
-    fn from(value: ApiType) -> Self {
-        match value {
-            ApiType::OpenAi => jutella::ApiType::OpenAi,
-            ApiType::OpenRouter => jutella::ApiType::OpenRouter,
-        }
-    }
-}
-
 #[derive(Debug, Parser)]
 #[command(version)]
 #[command(about = "Chatbot API CLI. Supports OpenAI chat completions API, \
@@ -95,8 +86,12 @@ pub struct Args {
     show_token_usage: bool,
 
     /// Reasoning effort. Typical values are: `minimal`, `low`, `medium`, or `high`.
-    #[arg(short, long)]
+    #[arg(short = 'e', long)]
     reasoning_effort: Option<String>,
+
+    /// Reasoning budget (max tokens). Only supported by OpenRouter API.
+    #[arg(short = 'b', long, conflicts_with = "reasoning_effort")]
+    reasoning_budget: Option<i64>,
 
     /// Verbosity of the answers. Typical values are: `low`, `medium`, or `high`.
     #[arg(short, long)]
@@ -137,12 +132,13 @@ struct ConfigFile {
     xclip: Option<bool>,
     show_token_usage: Option<bool>,
     reasoning_effort: Option<String>,
+    reasoning_budget: Option<i64>,
     verbosity: Option<String>,
 }
 
 pub struct Configuration {
     pub api_url: String,
-    pub api_type: jutella::ApiType,
+    pub api_options: jutella::ApiOptions,
     pub api_version: Option<String>,
     pub auth: Auth,
     pub model: String,
@@ -151,7 +147,6 @@ pub struct Configuration {
     pub max_history_tokens: Option<usize>,
     pub xclip: bool,
     pub show_token_usage: bool,
-    pub reasoning_effort: Option<String>,
     pub verbosity: Option<String>,
 }
 
@@ -169,6 +164,7 @@ impl Configuration {
             xclip,
             show_token_usage,
             reasoning_effort,
+            reasoning_budget,
             verbosity,
         } = args;
 
@@ -234,11 +230,33 @@ impl Configuration {
         let show_token_usage = show_token_usage || config.show_token_usage.unwrap_or_default();
 
         let reasoning_effort = reasoning_effort.or(config.reasoning_effort);
+        let reasoning_budget = reasoning_budget.or(config.reasoning_budget);
+        let api_options = match (api_type, reasoning_effort, reasoning_budget) {
+            (ApiType::OpenAi, effort, None) => jutella::ApiOptions::OpenAi {
+                reasoning_effort: effort,
+            },
+            (ApiType::OpenRouter, None, None) => {
+                jutella::ApiOptions::OpenRouter { reasoning: None }
+            }
+            (ApiType::OpenRouter, Some(effort), None) => jutella::ApiOptions::OpenRouter {
+                reasoning: Some(jutella::ReasoningSettings::Effort(effort)),
+            },
+            (ApiType::OpenRouter, None, Some(budget)) => jutella::ApiOptions::OpenRouter {
+                reasoning: Some(jutella::ReasoningSettings::Budget(budget)),
+            },
+            _ => {
+                return Err(anyhow!(
+                    "Only one of `reasoning_effort` or `reasoning_budget` can be supplied. \
+                     `reasoning_budget` is only supported by OpenRouter API."
+                ))
+            }
+        };
+
         let verbosity = verbosity.or(config.verbosity);
 
         Ok(Self {
             api_url,
-            api_type: api_type.into(),
+            api_options,
             api_version,
             auth,
             model,
@@ -247,7 +265,6 @@ impl Configuration {
             max_history_tokens,
             xclip,
             show_token_usage,
-            reasoning_effort,
             verbosity,
         })
     }
