@@ -34,7 +34,7 @@ use crate::chat_client::{
 /// OpenRouter reasoning settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReasoningSettings {
-    /// Rasoning effort, Typically one of `minimal`, `low`, `medium`, or `high`.
+    /// Rasoning effort. Typically one of `minimal`, `low`, `medium`, or `high`.
     Effort(String),
     /// Reasoning budget in tokens.
     Budget(i64),
