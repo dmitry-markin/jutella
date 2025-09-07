@@ -50,3 +50,6 @@ xclip = false
 # Display token usage after each response. The information is displayed in the following format:
 # input tokens (cached input tokens) / output tokens (reasoning tokens)
 show_token_usage = false
+
+# Show reasoning (summary) performed by the model. Only supported when using OpenRouter API.
+show_reasoning = false
