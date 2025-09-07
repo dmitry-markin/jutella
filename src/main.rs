@@ -37,7 +37,7 @@ use std::{
 async fn main() -> anyhow::Result<()> {
     let Configuration {
         auth,
-        api_type,
+        api_options,
         api_version,
         api_url,
         model,
@@ -46,7 +46,6 @@ async fn main() -> anyhow::Result<()> {
         show_token_usage,
         min_history_tokens,
         max_history_tokens,
-        reasoning_effort,
         verbosity,
     } = Configuration::init(Args::parse())?;
 
@@ -54,13 +53,12 @@ async fn main() -> anyhow::Result<()> {
         auth,
         ChatClientConfig {
             api_url,
-            api_type,
+            api_options,
             api_version,
             model,
             system_message,
             min_history_tokens,
             max_history_tokens,
-            reasoning_effort,
             verbosity,
         },
     )
