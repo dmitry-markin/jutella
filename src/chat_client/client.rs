@@ -126,6 +126,8 @@ impl Default for ChatClientConfig {
 pub struct Completion {
     /// Generated response.
     pub response: String,
+    /// Reasoning performed by the model.
+    pub reasoning: Option<String>,
     /// Input tokens used.
     pub tokens_in: usize,
     /// Cached input tokens, if returned by the API.
@@ -268,6 +270,7 @@ impl ChatClient {
 
         Ok(Completion {
             response,
+            reasoning: assistant_message.reasoning,
             tokens_in: completion.usage.prompt_tokens,
             tokens_in_cached: completion
                 .usage

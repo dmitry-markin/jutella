@@ -44,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
         system_message,
         xclip,
         show_token_usage,
+        show_reasoning,
         min_history_tokens,
         max_history_tokens,
         verbosity,
@@ -72,6 +73,10 @@ async fn main() -> anyhow::Result<()> {
             .await
             .inspect_err(|e| print_error(e))
         {
+            // `trim()` is needed for reasoning, because OpenRouter returns three empty lines in
+            // the end.
+            show_reasoning.then(|| completion.reasoning.map(|r| print_reasoning(&r.trim())));
+
             print_response(&completion.response);
 
             if xclip {
@@ -103,6 +108,10 @@ async fn main() -> anyhow::Result<()> {
 fn print_prompt() -> Result<(), io::Error> {
     print!("{} ", "You:".bold().red());
     io::stdout().flush()
+}
+
+fn print_reasoning(reasoning: &str) {
+    println!("\n{} {reasoning}", "Reasoning:".bold().blue());
 }
 
 fn print_response(response: &str) {

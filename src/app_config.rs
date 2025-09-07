@@ -85,6 +85,10 @@ pub struct Args {
     #[arg(short = 'g', long)]
     show_token_usage: bool,
 
+    /// Show reasoning (summary) performed by the model. Only supported when using OpenRouter API.
+    #[arg(short = 'r', long)]
+    show_reasoning: bool,
+
     /// Reasoning effort. Typical values are: `minimal`, `low`, `medium`, or `high`.
     #[arg(short = 'e', long)]
     reasoning_effort: Option<String>,
@@ -131,6 +135,7 @@ struct ConfigFile {
     max_history_tokens: Option<usize>,
     xclip: Option<bool>,
     show_token_usage: Option<bool>,
+    show_reasoning: Option<bool>,
     reasoning_effort: Option<String>,
     reasoning_budget: Option<i64>,
     verbosity: Option<String>,
@@ -147,6 +152,7 @@ pub struct Configuration {
     pub max_history_tokens: Option<usize>,
     pub xclip: bool,
     pub show_token_usage: bool,
+    pub show_reasoning: bool,
     pub verbosity: Option<String>,
 }
 
@@ -163,6 +169,7 @@ impl Configuration {
             config,
             xclip,
             show_token_usage,
+            show_reasoning,
             reasoning_effort,
             reasoning_budget,
             verbosity,
@@ -228,6 +235,7 @@ impl Configuration {
 
         let xclip = xclip || config.xclip.unwrap_or_default();
         let show_token_usage = show_token_usage || config.show_token_usage.unwrap_or_default();
+        let show_reasoning = show_reasoning || config.show_reasoning.unwrap_or_default();
 
         let reasoning_effort = reasoning_effort.or(config.reasoning_effort);
         let reasoning_budget = reasoning_budget.or(config.reasoning_budget);
@@ -265,6 +273,7 @@ impl Configuration {
             max_history_tokens,
             xclip,
             show_token_usage,
+            show_reasoning,
             verbosity,
         })
     }
