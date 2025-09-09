@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-09-09
+
+This release adds support for getting reasoning summaries and setting `reasoning_budget` when using OpenRouter API.
+
+### Added
+
+- Option to show reasoning summary (only OpenRouter API) ([#17](https://github.com/dmitry-markin/jutella/pull/17))
+- Support `reasoning_budget` with OpenRouter API ([#16](https://github.com/dmitry-markin/jutella/pull/16))
+
 ## [0.5.0] - 2025-09-06
 
 This relase adds support for [OpenRouter](https://openrouter.ai/) API, exposes options for `reasonning_effort` and response `verbosity`, extends token usage reporting, and adds token usage display to the CLI client.

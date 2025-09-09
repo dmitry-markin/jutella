@@ -75,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
         {
             // `trim()` is needed for reasoning, because OpenRouter returns three empty lines in
             // the end.
-            show_reasoning.then(|| completion.reasoning.map(|r| print_reasoning(&r.trim())));
+            show_reasoning.then(|| completion.reasoning.map(|r| print_reasoning(r.trim())));
 
             print_response(&completion.response);
 
