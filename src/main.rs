@@ -40,6 +40,7 @@ async fn main() -> anyhow::Result<()> {
         api_options,
         api_version,
         api_url,
+        timeout,
         model,
         system_message,
         xclip,
@@ -50,19 +51,18 @@ async fn main() -> anyhow::Result<()> {
         verbosity,
     } = Configuration::init(Args::parse())?;
 
-    let mut chat = ChatClient::new(
+    let mut chat = ChatClient::new(ChatClientConfig {
         auth,
-        ChatClientConfig {
-            api_url,
-            api_options,
-            api_version,
-            model,
-            system_message,
-            min_history_tokens,
-            max_history_tokens,
-            verbosity,
-        },
-    )
+        api_url,
+        api_options,
+        api_version,
+        timeout,
+        model,
+        system_message,
+        min_history_tokens,
+        max_history_tokens,
+        verbosity,
+    })
     .context("Failed to initialize the client")?;
 
     print_prompt()?;
