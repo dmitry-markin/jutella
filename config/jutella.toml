@@ -14,6 +14,9 @@ api_token = "<API token>"
 # Optional `api-version` GET parameter, used by Azure endpoints.
 #api_version = "2023-03-15-preview"
 
+# HTTP request timeout in seconds. 5 mins by default.
+#timeout = 300
+
 # Model to use.
 model = "gpt-4o-mini"
 

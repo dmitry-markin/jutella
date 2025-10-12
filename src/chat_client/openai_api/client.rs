@@ -25,13 +25,12 @@
 use crate::chat_client::openai_api::chat_completions::{ChatCompletions, ChatCompletionsBody};
 use reqwest::{
     header::{HeaderMap, HeaderName, HeaderValue, InvalidHeaderValue, AUTHORIZATION},
-    Client, ClientBuilder, StatusCode,
+    Client, StatusCode,
 };
 use serde::Deserialize;
 use std::{fmt::Display, str::FromStr, time::Duration};
 
 const CHAT_COMPLETIONS_ENDPOINT: &str = "chat/completions";
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 
 /// Authorization header.
 ///
@@ -65,33 +64,45 @@ impl TryFrom<Auth> for HeaderMap {
     }
 }
 
+/// OpenAI REST API client config.
+pub struct OpenAiClientConfig {
+    /// Reqwest client.
+    pub client: Client,
+    /// Authentication token/key.
+    pub auth: Auth,
+    /// OpenAI chat API endpoint.
+    pub base_url: String,
+    /// API version used by Azure endpoints.
+    pub api_version: Option<String>,
+    /// HTTP request timeout.
+    pub timeout: Duration,
+}
+
 /// OpenAI REST API client.
 pub struct OpenAiClient {
     client: Client,
     endpoint: String,
+    headers: HeaderMap,
+    timeout: Duration,
 }
 
 impl OpenAiClient {
     /// Create new OpenAI API client.
-    pub fn new(auth: Auth, base_url: String, api_version: Option<String>) -> Result<Self, Error> {
-        let client = ClientBuilder::new()
-            .default_headers(auth.try_into()?)
-            .timeout(REQUEST_TIMEOUT)
-            .build()?;
-
-        let endpoint = build_url(base_url, api_version);
-
-        Ok(Self { client, endpoint })
-    }
-
-    /// Create new OpenAI API client with custom [`reqwest::Client`].
-    ///
-    /// You are responsible for configuration of authorization headers and the request timeout!
-    pub fn new_with_client(client: Client, base_url: String, api_version: Option<String>) -> Self {
-        Self {
+    pub fn new(
+        OpenAiClientConfig {
+            client,
+            auth,
+            base_url,
+            api_version,
+            timeout,
+        }: OpenAiClientConfig,
+    ) -> Result<Self, Error> {
+        Ok(Self {
             client,
             endpoint: build_url(base_url, api_version),
-        }
+            headers: auth.try_into()?,
+            timeout,
+        })
     }
 
     /// Request chat completion message.
@@ -102,7 +113,9 @@ impl OpenAiClient {
         let response = self
             .client
             .post(self.endpoint.clone())
+            .headers(self.headers.clone())
             .json(&body)
+            .timeout(self.timeout)
             .send()
             .await?;
 

@@ -26,10 +26,11 @@ use crate::chat_client::{
     context::Context,
     openai_api::{
         chat_completions::{ChatCompletionsBody, OpenRouterReasoning},
-        client::{Auth, Error as OpenAiClientError, OpenAiClient},
+        client::{Auth, Error as OpenAiClientError, OpenAiClient, OpenAiClientConfig},
         message::{self, AssistantMessage},
     },
 };
+use std::time::Duration;
 
 /// OpenRouter reasoning settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,12 +79,16 @@ impl ApiOptions {
 /// Configuration for [`ChatClient`].
 #[derive(Debug)]
 pub struct ChatClientConfig {
+    /// Authentication token/key.
+    pub auth: Auth,
     /// OpenAI chat API endpoint.
     pub api_url: String,
     /// API type.
     pub api_options: ApiOptions,
     /// API version.
     pub api_version: Option<String>,
+    /// HTTP request timeout.
+    pub timeout: Duration,
     /// Model.
     pub model: String,
     /// System message to initialize the model.
@@ -104,14 +109,17 @@ pub struct ChatClientConfig {
     pub verbosity: Option<String>,
 }
 
-impl Default for ChatClientConfig {
-    fn default() -> Self {
+impl ChatClientConfig {
+    /// Create default config with given authentication parameters.
+    pub fn default_with_auth(auth: Auth) -> Self {
         Self {
+            auth,
             api_url: String::from("https://api.openai.com/v1/"),
             api_options: ApiOptions::OpenAi {
                 reasoning_effort: None,
             },
             api_version: None,
+            timeout: Duration::from_secs(300),
             model: String::from("gpt-4o-mini"),
             system_message: None,
             min_history_tokens: None,
@@ -181,30 +189,8 @@ pub struct ChatClient {
 
 impl ChatClient {
     /// Create new [`ChatClient`] accessing OpenAI chat API.
-    pub fn new(auth: Auth, config: ChatClientConfig) -> Result<Self, Error> {
-        let ChatClientConfig {
-            api_url,
-            api_options,
-            api_version,
-            model,
-            system_message,
-            min_history_tokens,
-            max_history_tokens,
-            verbosity,
-        } = config;
-
-        let api_url = ensure_trailing_slash(api_url);
-        let context = create_context(system_message, min_history_tokens, max_history_tokens)?;
-
-        Ok(Self {
-            client: OpenAiClient::new(auth, api_url, api_version)?,
-            model_config: ModelConfig {
-                model,
-                api_options,
-                verbosity,
-            },
-            context,
-        })
+    pub fn new(config: ChatClientConfig) -> Result<Self, Error> {
+        Self::new_with_client(config, reqwest::Client::new())
     }
 
     /// Cretae new [`ChatClient`] accessing OpenAI chat API with preconfigured [`reqwest::Client`].
@@ -212,13 +198,15 @@ impl ChatClient {
     /// Make sure to setup a header `Authorization: Bearer {api_key}` if using OpenAI endpoints,
     /// or `api-key: {api_key}` header if using Azure endpoints.
     pub fn new_with_client(
-        client: reqwest::Client,
         config: ChatClientConfig,
+        client: reqwest::Client,
     ) -> Result<Self, Error> {
         let ChatClientConfig {
+            auth,
             api_url,
             api_options,
             api_version,
+            timeout,
             model,
             system_message,
             min_history_tokens,
@@ -226,11 +214,17 @@ impl ChatClient {
             verbosity,
         } = config;
 
-        let api_url = ensure_trailing_slash(api_url);
+        let client = OpenAiClient::new(OpenAiClientConfig {
+            client,
+            auth,
+            base_url: ensure_trailing_slash(api_url),
+            api_version,
+            timeout,
+        })?;
         let context = create_context(system_message, min_history_tokens, max_history_tokens)?;
 
         Ok(Self {
-            client: OpenAiClient::new_with_client(client, api_url, api_version),
+            client,
             model_config: ModelConfig {
                 model,
                 api_options,
