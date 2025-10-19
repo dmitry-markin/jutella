@@ -443,6 +443,9 @@ pub struct StreamingDelta {
 
     /// Tool calls.
     pub tool_calls: Option<Vec<Value>>,
+
+    /// OpenRouter reasoning summary.
+    pub reasoning: Option<String>,
 }
 
 /// Streaming choice.

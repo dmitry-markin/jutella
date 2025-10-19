@@ -30,11 +30,12 @@ use crate::chat_client::{
         message::{self, AssistantMessage},
     },
 };
-use std::time::Duration;
-
-/// TMP
-use eventsource_stream::EventStream;
-use futures::stream::Stream;
+use eventsource_stream::{Event, EventStream, EventStreamError};
+use futures::{
+    stream::{Stream, StreamExt},
+    task::Poll,
+};
+use std::{pin::Pin, time::Duration};
 
 /// OpenRouter reasoning settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -293,19 +294,27 @@ impl ChatClient {
     }
 
     /// Stream completion, extending the chat context on success.
-    pub async fn stream_completion(
-        &mut self,
+    pub async fn stream_completion<'a>(
+        &'a mut self,
         request: String,
-    ) -> Result<EventStream<impl Stream<Item = Result<bytes::Bytes, reqwest::Error>>>, Error> {
-        self.client
+    ) -> Result<
+        CompletionStream<'a, impl Stream<Item = Result<Event, EventStreamError<reqwest::Error>>>>,
+        Error,
+    > {
+        let stream = self
+            .client
             .chat_completions_stream(Self::body(
                 self.model_config.clone(),
                 &self.context,
                 request.clone(),
                 true,
             ))
-            .await
-            .map_err(Error::from)
+            .await?;
+
+        Ok(CompletionStream {
+            client: self,
+            stream,
+        })
     }
 
     /// Construct a request body.
@@ -356,4 +365,24 @@ fn create_context(
     };
 
     Ok(context)
+}
+
+/// Stream returned by [`ChatClient::stream_completion`].
+pub struct CompletionStream<'a, S> {
+    client: &'a mut ChatClient,
+    stream: S,
+}
+
+impl<'a, S> Stream for CompletionStream<'a, S>
+where
+    S: Stream<Item = Result<Event, EventStreamError<reqwest::Error>>> + Unpin,
+{
+    type Item = Result<Event, EventStreamError<reqwest::Error>>;
+
+    fn poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut futures::task::Context,
+    ) -> Poll<Option<Self::Item>> {
+        self.get_mut().stream.poll_next_unpin(cx)
+    }
 }
