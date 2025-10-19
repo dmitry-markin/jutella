@@ -32,6 +32,10 @@ use crate::chat_client::{
 };
 use std::time::Duration;
 
+/// TMP
+use eventsource_stream::EventStream;
+use futures::stream::Stream;
+
 /// OpenRouter reasoning settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReasoningSettings {
@@ -129,13 +133,9 @@ impl ChatClientConfig {
     }
 }
 
-/// Generated completion.
+/// Token usage info.
 #[derive(Debug)]
-pub struct Completion {
-    /// Generated response.
-    pub response: String,
-    /// Reasoning performed by the model.
-    pub reasoning: Option<String>,
+pub struct TokenUsage {
     /// Input tokens used.
     pub tokens_in: usize,
     /// Cached input tokens, if returned by the API.
@@ -144,6 +144,17 @@ pub struct Completion {
     pub tokens_out: usize,
     /// Reasoning tokens used, if returned by the API.
     pub tokens_reasoning: Option<usize>,
+}
+
+/// Generated completion.
+#[derive(Debug)]
+pub struct Completion {
+    /// Generated response.
+    pub response: String,
+    /// Reasoning performed by the model.
+    pub reasoning: Option<String>,
+    /// Token usage.
+    pub token_usage: TokenUsage,
 }
 
 /// Errors during interaction with a chatbot.
@@ -247,6 +258,7 @@ impl ChatClient {
                 self.model_config.clone(),
                 &self.context,
                 request.clone(),
+                false,
             ))
             .await?;
 
@@ -265,17 +277,35 @@ impl ChatClient {
         Ok(Completion {
             response,
             reasoning: assistant_message.reasoning,
-            tokens_in: completion.usage.prompt_tokens,
-            tokens_in_cached: completion
-                .usage
-                .prompt_tokens_details
-                .and_then(|d| d.cached_tokens),
-            tokens_out: completion.usage.completion_tokens,
-            tokens_reasoning: completion
-                .usage
-                .completion_tokens_details
-                .and_then(|d| d.reasoning_tokens),
+            token_usage: TokenUsage {
+                tokens_in: completion.usage.prompt_tokens,
+                tokens_in_cached: completion
+                    .usage
+                    .prompt_tokens_details
+                    .and_then(|d| d.cached_tokens),
+                tokens_out: completion.usage.completion_tokens,
+                tokens_reasoning: completion
+                    .usage
+                    .completion_tokens_details
+                    .and_then(|d| d.reasoning_tokens),
+            },
         })
+    }
+
+    /// Stream completion, extending the chat context on success.
+    pub async fn stream_completion(
+        &mut self,
+        request: String,
+    ) -> Result<EventStream<impl Stream<Item = Result<bytes::Bytes, reqwest::Error>>>, Error> {
+        self.client
+            .chat_completions_stream(Self::body(
+                self.model_config.clone(),
+                &self.context,
+                request.clone(),
+                true,
+            ))
+            .await
+            .map_err(Error::from)
     }
 
     /// Construct a request body.
@@ -287,6 +317,7 @@ impl ChatClient {
         }: ModelConfig,
         context: &Context,
         request: String,
+        stream: bool,
     ) -> ChatCompletionsBody {
         ChatCompletionsBody {
             model,
@@ -294,6 +325,7 @@ impl ChatClient {
             reasoning_effort: api_options.as_openai_reasoning_effort(),
             reasoning: api_options.as_openrouter_reasoning_settings(),
             verbosity,
+            stream: Some(stream),
             ..Default::default()
         }
     }

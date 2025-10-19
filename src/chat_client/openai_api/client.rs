@@ -23,12 +23,15 @@
 //! OpenAI REST API client.
 
 use crate::chat_client::openai_api::chat_completions::{ChatCompletions, ChatCompletionsBody};
+use eventsource_stream::{EventStream, Eventsource};
+use futures::stream::Stream;
 use reqwest::{
     header::{HeaderMap, HeaderName, HeaderValue, InvalidHeaderValue, AUTHORIZATION},
-    Client, StatusCode,
+    Client, Method, Request, RequestBuilder, StatusCode,
 };
 use serde::Deserialize;
 use std::{fmt::Display, str::FromStr, time::Duration};
+use url::{ParseError, Url};
 
 const CHAT_COMPLETIONS_ENDPOINT: &str = "chat/completions";
 
@@ -81,7 +84,7 @@ pub struct OpenAiClientConfig {
 /// OpenAI REST API client.
 pub struct OpenAiClient {
     client: Client,
-    endpoint: String,
+    endpoint: Url,
     headers: HeaderMap,
     timeout: Duration,
 }
@@ -99,7 +102,7 @@ impl OpenAiClient {
     ) -> Result<Self, Error> {
         Ok(Self {
             client,
-            endpoint: build_url(base_url, api_version),
+            endpoint: Url::parse(&build_url(base_url, api_version))?,
             headers: auth.try_into()?,
             timeout,
         })
@@ -110,14 +113,7 @@ impl OpenAiClient {
         &mut self,
         body: ChatCompletionsBody,
     ) -> Result<ChatCompletions, Error> {
-        let response = self
-            .client
-            .post(self.endpoint.clone())
-            .headers(self.headers.clone())
-            .json(&body)
-            .timeout(self.timeout)
-            .send()
-            .await?;
+        let response = self.build_request(body).send().await?;
 
         if response.status().is_success() {
             Ok(response.json().await?)
@@ -139,6 +135,49 @@ impl OpenAiClient {
             .into())
         }
     }
+
+    /// Request chat completion stream.
+    pub async fn chat_completions_stream(
+        &mut self,
+        body: ChatCompletionsBody,
+    ) -> Result<EventStream<impl Stream<Item = Result<bytes::Bytes, reqwest::Error>>>, Error> {
+        Ok(self
+            .build_request(body)
+            .send()
+            .await?
+            .bytes_stream()
+            .eventsource())
+    }
+
+    /// Build request.
+    fn build_request(&mut self, body: ChatCompletionsBody) -> RequestBuilder {
+        RequestBuilder::from_parts(
+            self.client.clone(),
+            Request::new(Method::POST, self.endpoint.clone()),
+        )
+        .headers(self.headers.clone())
+        .json(&body)
+        .timeout(self.timeout)
+    }
+
+    // Request chat completion stream.
+    //pub async fn chat_completions_stream_old(
+    //    &mut self,
+    //    body: ChatCompletionsBody,
+    //) -> Result<EventSource, Error> {
+    //    let builder = RequestBuilder::from_parts(
+    //        self.client.clone(),
+    //        Request::new(Method::POST, self.endpoint.clone()),
+    //    )
+    //    .headers(self.headers.clone())
+    //    .json(&body)
+    //    .timeout(self.timeout);
+
+    //    let mut eventsource = builder.eventsource().expect("body is not a stream; qed");
+    //    eventsource.set_retry_policy(Box::new(retry::Never));
+
+    //    Ok(eventsource)
+    //}
 }
 
 fn build_url(base_url: String, api_version: Option<String>) -> String {
@@ -163,6 +202,10 @@ pub enum Error {
     /// API (HTTP) error.
     #[error("{0}")]
     Api(#[from] ApiError),
+
+    /// URL parsing error.
+    #[error("Invalid URL: {0}")]
+    InvalidUrl(#[from] ParseError),
 }
 
 impl From<reqwest::Error> for Error {
