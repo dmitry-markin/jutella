@@ -25,13 +25,16 @@
 use crate::chat_client::{
     context::Context,
     openai_api::{
-        chat_completions::{ChatCompletionsBody, OpenRouterReasoning},
+        chat_completions::{
+            ChatCompletionsBody, OpenRouterReasoning, StreamOptions, StreamingChunk,
+        },
         client::{Auth, Error as OpenAiClientError, OpenAiClient, OpenAiClientConfig},
         message::{self, AssistantMessage},
     },
 };
 use eventsource_stream::{Event, EventStream, EventStreamError};
 use futures::{
+    ready,
     stream::{Stream, StreamExt},
     task::Poll,
 };
@@ -182,6 +185,13 @@ pub enum Error {
     /// Tokenizer initialization error.
     #[error("Failed to initialize tokenizer: {0}")]
     TokenizerInit(String),
+    /// Stream error.
+    // TODO: decompose and extract transport error.
+    #[error("Stream error: {0}")]
+    StreamError(#[from] EventStreamError<reqwest::Error>),
+    /// Completion delta JSON parsing error.
+    #[error("Completion delta JSON parsing error: {0}")]
+    DeltaJsonError(#[from] serde_json::Error),
 }
 
 /// Model configuration.
@@ -314,6 +324,7 @@ impl ChatClient {
         Ok(CompletionStream {
             client: self,
             stream,
+            terminated: false,
         })
     }
 
@@ -335,6 +346,10 @@ impl ChatClient {
             reasoning: api_options.as_openrouter_reasoning_settings(),
             verbosity,
             stream: Some(stream),
+            stream_options: stream.then_some(StreamOptions {
+                include_obfuscation: None,
+                include_usage: Some(true),
+            }),
             ..Default::default()
         }
     }
@@ -367,22 +382,70 @@ fn create_context(
     Ok(context)
 }
 
+/// Chat completion delta event.
+pub enum Delta {
+    /// Assistant response delta.
+    Content(String),
+    /// Reasoning delta. Returned before the content.
+    Reasoning(String),
+    /// Token usage info. Always the last event.
+    TokenUsage(TokenUsage),
+}
+
 /// Stream returned by [`ChatClient::stream_completion`].
 pub struct CompletionStream<'a, S> {
     client: &'a mut ChatClient,
     stream: S,
+    terminated: bool,
 }
 
 impl<'a, S> Stream for CompletionStream<'a, S>
 where
     S: Stream<Item = Result<Event, EventStreamError<reqwest::Error>>> + Unpin,
 {
-    type Item = Result<Event, EventStreamError<reqwest::Error>>;
+    type Item = Result<Delta, Error>;
 
     fn poll_next(
         self: Pin<&mut Self>,
         cx: &mut futures::task::Context,
     ) -> Poll<Option<Self::Item>> {
-        self.get_mut().stream.poll_next_unpin(cx)
+        let this = self.get_mut();
+
+        if this.terminated {
+            return Poll::Ready(None);
+        }
+
+        match ready!(this.stream.poll_next_unpin(cx)) {
+            Some(Ok(event)) => {
+                if event.data == "[DONE]" {
+                    this.terminated = true;
+
+                    return Poll::Ready(None);
+                    // TODO: poll underlying stream to give it a chance to clean up.
+                }
+
+                // TODO: extend context.
+                Poll::Ready(Some(parse_stream_chunk(&event.data)))
+            }
+            Some(Err(e)) => {
+                this.terminated = true;
+
+                Poll::Ready(Some(Err(Error::from(e))))
+            }
+            None => {
+                this.terminated = true;
+
+                Poll::Ready(None)
+            }
+        }
     }
+}
+
+fn parse_stream_chunk(event: &str) -> Result<Delta, Error> {
+    let mut chunk: StreamingChunk = serde_json::from_str(event)?;
+
+    // TODO: proper error handling.
+    // TODO: reasoning parsing.
+    // TODO: token usage parsing.
+    Ok(Delta::Content(chunk.choices.pop().unwrap().delta.content))
 }

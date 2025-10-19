@@ -28,7 +28,7 @@ use app_config::{Args, Configuration};
 use anyhow::{anyhow, Context as _};
 use colored::Colorize as _;
 use futures::stream::StreamExt;
-use jutella::{ChatClient, ChatClientConfig, TokenUsage};
+use jutella::{ChatClient, ChatClientConfig, Delta, TokenUsage};
 use std::{
     io::{self, Read as _, Write as _},
     process::{Command, Stdio},
@@ -124,11 +124,18 @@ impl Chat {
             .await
             .inspect_err(|e| print_error(e))
         {
+            print!("\n{} ", "Assistant:".bold().green());
+
             while let Some(event) = stream.next().await {
                 if let Ok(event) = event.inspect_err(|e| print_error(e)) {
-                    println!("{}", event.data);
+                    if let Delta::Content(content) = event {
+                        print!("{}", content);
+                        io::stdout().flush()?;
+                    }
                 }
             }
+
+            println!("\n");
         }
 
         print_prompt()?;
