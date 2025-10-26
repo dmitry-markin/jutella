@@ -159,25 +159,6 @@ impl OpenAiClient {
         .json(&body)
         .timeout(self.timeout)
     }
-
-    // Request chat completion stream.
-    //pub async fn chat_completions_stream_old(
-    //    &mut self,
-    //    body: ChatCompletionsBody,
-    //) -> Result<EventSource, Error> {
-    //    let builder = RequestBuilder::from_parts(
-    //        self.client.clone(),
-    //        Request::new(Method::POST, self.endpoint.clone()),
-    //    )
-    //    .headers(self.headers.clone())
-    //    .json(&body)
-    //    .timeout(self.timeout);
-
-    //    let mut eventsource = builder.eventsource().expect("body is not a stream; qed");
-    //    eventsource.set_retry_policy(Box::new(retry::Never));
-
-    //    Ok(eventsource)
-    //}
 }
 
 fn build_url(base_url: String, api_version: Option<String>) -> String {
