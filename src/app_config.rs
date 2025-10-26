@@ -73,6 +73,10 @@ pub struct Args {
     #[arg(short, long)]
     system_message: Option<String>,
 
+    /// Stream responses.
+    #[arg(long)]
+    stream: bool,
+
     /// Config file location. Default: "$HOME/.config/jutella.toml".
     #[arg(short, long)]
     config: Option<PathBuf>,
@@ -133,6 +137,7 @@ struct ConfigFile {
     timeout: Option<u64>,
     model: Option<String>,
     system_message: Option<String>,
+    stream: Option<bool>,
     min_history_tokens: Option<usize>,
     max_history_tokens: Option<usize>,
     xclip: Option<bool>,
@@ -151,6 +156,7 @@ pub struct Configuration {
     pub timeout: Duration,
     pub model: String,
     pub system_message: Option<String>,
+    pub stream: bool,
     pub min_history_tokens: Option<usize>,
     pub max_history_tokens: Option<usize>,
     pub xclip: bool,
@@ -167,6 +173,7 @@ impl Configuration {
             api_version,
             model,
             system_message,
+            stream,
             min_history_tokens,
             max_history_tokens,
             config,
@@ -241,6 +248,7 @@ impl Configuration {
         let min_history_tokens = min_history_tokens.or(config.min_history_tokens);
         let max_history_tokens = max_history_tokens.or(config.max_history_tokens);
 
+        let stream = stream || config.stream.unwrap_or_default();
         let xclip = xclip || config.xclip.unwrap_or_default();
         let show_token_usage = show_token_usage || config.show_token_usage.unwrap_or_default();
         let show_reasoning = show_reasoning || config.show_reasoning.unwrap_or_default();
@@ -278,6 +286,7 @@ impl Configuration {
             timeout,
             model,
             system_message,
+            stream,
             min_history_tokens,
             max_history_tokens,
             xclip,

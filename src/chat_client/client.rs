@@ -24,12 +24,16 @@
 
 use crate::chat_client::{
     context::Context,
+    error::Error,
     openai_api::{
-        chat_completions::{ChatCompletionsBody, OpenRouterReasoning},
-        client::{Auth, Error as OpenAiClientError, OpenAiClient, OpenAiClientConfig},
-        message::{self, AssistantMessage},
+        chat_completions::{ChatCompletionsBody, OpenRouterReasoning, StreamOptions, Usage},
+        client::{Auth, OpenAiClient, OpenAiClientConfig},
+        message::AssistantMessage,
     },
+    stream::CompletionStream,
 };
+use eventsource_stream::{Event, EventStreamError};
+use futures::stream::Stream;
 use std::time::Duration;
 
 /// OpenRouter reasoning settings.
@@ -129,13 +133,9 @@ impl ChatClientConfig {
     }
 }
 
-/// Generated completion.
+/// Token usage info.
 #[derive(Debug)]
-pub struct Completion {
-    /// Generated response.
-    pub response: String,
-    /// Reasoning performed by the model.
-    pub reasoning: Option<String>,
+pub struct TokenUsage {
     /// Input tokens used.
     pub tokens_in: usize,
     /// Cached input tokens, if returned by the API.
@@ -146,30 +146,28 @@ pub struct Completion {
     pub tokens_reasoning: Option<usize>,
 }
 
-/// Errors during interaction with a chatbot.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// Error reported by the model API.
-    #[error("API error: {0}")]
-    OpenAiClient(#[from] OpenAiClientError),
-    /// The response contains no completion choices.
-    #[error("Response contains no choices")]
-    NoChoices,
-    /// The response contains no message.
-    #[error("Response contains no message")]
-    NoMessage,
-    /// Message conversion error.
-    #[error("Invalid message: {0}")]
-    InvalidMessage(#[from] message::Error),
-    /// The completion response message contains no `content`.
-    #[error("Assistant message contains no `content`")]
-    NoContent,
-    /// Model refused the request.
-    #[error("Model refused the request: \"{0}\"")]
-    Refusal(String),
-    /// Tokenizer initialization error.
-    #[error("Failed to initialize tokenizer: {0}")]
-    TokenizerInit(String),
+impl From<Usage> for TokenUsage {
+    fn from(usage: Usage) -> Self {
+        Self {
+            tokens_in: usage.prompt_tokens,
+            tokens_in_cached: usage.prompt_tokens_details.and_then(|d| d.cached_tokens),
+            tokens_out: usage.completion_tokens,
+            tokens_reasoning: usage
+                .completion_tokens_details
+                .and_then(|d| d.reasoning_tokens),
+        }
+    }
+}
+
+/// Generated completion.
+#[derive(Debug)]
+pub struct Completion {
+    /// Generated response.
+    pub response: String,
+    /// Reasoning performed by the model.
+    pub reasoning: Option<String>,
+    /// Token usage.
+    pub token_usage: TokenUsage,
 }
 
 /// Model configuration.
@@ -247,6 +245,7 @@ impl ChatClient {
                 self.model_config.clone(),
                 &self.context,
                 request.clone(),
+                false,
             ))
             .await?;
 
@@ -260,22 +259,38 @@ impl ChatClient {
 
         // TODO: we likely need to count tokens used in case of errors as well.
 
-        self.context.push(request, response.clone());
+        self.extend_context(request, response.clone());
 
         Ok(Completion {
             response,
             reasoning: assistant_message.reasoning,
-            tokens_in: completion.usage.prompt_tokens,
-            tokens_in_cached: completion
-                .usage
-                .prompt_tokens_details
-                .and_then(|d| d.cached_tokens),
-            tokens_out: completion.usage.completion_tokens,
-            tokens_reasoning: completion
-                .usage
-                .completion_tokens_details
-                .and_then(|d| d.reasoning_tokens),
+            token_usage: completion.usage.into(),
         })
+    }
+
+    /// Stream completion, extending the chat context on success.
+    pub async fn stream_completion<'a>(
+        &'a mut self,
+        request: String,
+    ) -> Result<
+        CompletionStream<'a, impl Stream<Item = Result<Event, EventStreamError<reqwest::Error>>>>,
+        Error,
+    > {
+        let stream = self
+            .client
+            .chat_completions_stream(Self::body(
+                self.model_config.clone(),
+                &self.context,
+                request.clone(),
+                true,
+            ))
+            .await?;
+
+        Ok(CompletionStream::new(self, stream, request))
+    }
+
+    pub(crate) fn extend_context(&mut self, request: String, response: String) {
+        self.context.push(request, response);
     }
 
     /// Construct a request body.
@@ -287,6 +302,7 @@ impl ChatClient {
         }: ModelConfig,
         context: &Context,
         request: String,
+        stream: bool,
     ) -> ChatCompletionsBody {
         ChatCompletionsBody {
             model,
@@ -294,6 +310,11 @@ impl ChatClient {
             reasoning_effort: api_options.as_openai_reasoning_effort(),
             reasoning: api_options.as_openrouter_reasoning_settings(),
             verbosity,
+            stream: Some(stream),
+            stream_options: stream.then_some(StreamOptions {
+                include_obfuscation: None,
+                include_usage: Some(true),
+            }),
             ..Default::default()
         }
     }

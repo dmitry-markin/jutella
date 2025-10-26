@@ -27,7 +27,8 @@ use app_config::{Args, Configuration};
 
 use anyhow::{anyhow, Context as _};
 use colored::Colorize as _;
-use jutella::{ChatClient, ChatClientConfig};
+use futures::stream::StreamExt;
+use jutella::{ChatClient, ChatClientConfig, Delta, TokenUsage};
 use std::{
     io::{self, Read as _, Write as _},
     process::{Command, Stdio},
@@ -43,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
         timeout,
         model,
         system_message,
+        stream,
         xclip,
         show_token_usage,
         show_reasoning,
@@ -51,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
         verbosity,
     } = Configuration::init(Args::parse())?;
 
-    let mut chat = ChatClient::new(ChatClientConfig {
+    let client = ChatClient::new(ChatClientConfig {
         auth,
         api_url,
         api_options,
@@ -65,44 +67,154 @@ async fn main() -> anyhow::Result<()> {
     })
     .context("Failed to initialize the client")?;
 
-    print_prompt()?;
+    let mut chat = Chat {
+        client,
+        show_reasoning,
+        xclip,
+        show_token_usage,
+        stream,
+    };
 
-    for line in io::stdin().lines() {
-        if let Ok(completion) = chat
-            .request_completion(line?)
+    chat.run().await
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum DeltaType {
+    Nothing,
+    Reasoning,
+    Content,
+    Usage,
+}
+
+struct Chat {
+    client: ChatClient,
+    show_reasoning: bool,
+    xclip: bool,
+    show_token_usage: bool,
+    stream: bool,
+}
+
+impl Chat {
+    async fn handle_line(&mut self, line: String) -> anyhow::Result<()> {
+        if let Ok(completion) = self
+            .client
+            .request_completion(line)
             .await
             .inspect_err(|e| print_error(e))
         {
             // `trim()` is needed for reasoning, because OpenRouter returns three empty lines in
             // the end.
-            show_reasoning.then(|| completion.reasoning.map(|r| print_reasoning(r.trim())));
+            self.show_reasoning
+                .then(|| completion.reasoning.map(|r| print_reasoning(r.trim())));
 
             print_response(&completion.response);
 
-            if xclip {
+            if self.xclip {
                 copy_to_clipboard(completion.response)
                     .inspect_err(|e| print_error(e))
                     .unwrap_or_default();
             }
 
-            if show_token_usage {
-                let tokens_info = format!(
-                    "{} ({}) / {} ({})",
-                    completion.tokens_in,
-                    completion.tokens_in_cached.unwrap_or_default(),
-                    completion.tokens_out,
-                    completion.tokens_reasoning.unwrap_or_default(),
-                );
-                println!("{}\n", tokens_info.blue());
+            if self.show_token_usage {
+                print_token_usage(completion.token_usage);
+                println!("\n");
             }
         }
 
         print_prompt()?;
+
+        Ok(())
     }
 
-    println!();
+    async fn handle_line_streaming(&mut self, line: String) -> anyhow::Result<()> {
+        if let Ok(mut stream) = self
+            .client
+            .stream_completion(line)
+            .await
+            .inspect_err(|e| print_error(e))
+        {
+            let mut response = String::new();
+            let mut last_delta = DeltaType::Nothing;
+            // CR user entered is one newline.
+            let mut trailing_newlines = 1;
 
-    Ok(())
+            while let Some(event) = stream.next().await {
+                if let Ok(event) = event.inspect_err(|e| {
+                    println!();
+                    print_error(e);
+                }) {
+                    match event {
+                        Delta::Reasoning(reasoning) => {
+                            if last_delta != DeltaType::Reasoning {
+                                last_delta = DeltaType::Reasoning;
+
+                                if self.show_reasoning {
+                                    print!("{} ", "\nReasoning:".bold().blue());
+                                }
+                            }
+
+                            if self.show_reasoning {
+                                print!("{}", reasoning);
+                                trailing_newlines = count_trailing_newlines(reasoning);
+                                io::stdout().flush()?;
+                            }
+                        }
+                        Delta::Content(content) => {
+                            if last_delta != DeltaType::Content {
+                                last_delta = DeltaType::Content;
+
+                                for _ in 0..2 - trailing_newlines {
+                                    println!();
+                                }
+
+                                print!("{} ", "Assistant:".bold().green());
+                            }
+
+                            print!("{}", content);
+                            response.push_str(&content);
+                            io::stdout().flush()?;
+                        }
+                        Delta::Usage(usage) => {
+                            last_delta = DeltaType::Usage;
+
+                            if self.show_token_usage {
+                                println!("\n");
+                                print_token_usage(usage);
+                            }
+                        }
+                    }
+                }
+            }
+
+            println!("\n");
+
+            if self.xclip {
+                copy_to_clipboard(response)
+                    .inspect_err(|e| print_error(e))
+                    .unwrap_or_default();
+            }
+        }
+
+        print_prompt()?;
+
+        Ok(())
+    }
+
+    async fn run(&mut self) -> anyhow::Result<()> {
+        print_prompt()?;
+
+        for line in io::stdin().lines() {
+            if self.stream {
+                self.handle_line_streaming(line?).await?;
+            } else {
+                self.handle_line(line?).await?;
+            }
+        }
+
+        println!();
+
+        Ok(())
+    }
 }
 
 fn print_prompt() -> Result<(), io::Error> {
@@ -116,6 +228,17 @@ fn print_reasoning(reasoning: &str) {
 
 fn print_response(response: &str) {
     println!("\n{} {response}\n", "Assistant:".bold().green());
+}
+
+fn print_token_usage(usage: TokenUsage) {
+    let tokens_info = format!(
+        "{} ({}) / {} ({})",
+        usage.tokens_in,
+        usage.tokens_in_cached.unwrap_or_default(),
+        usage.tokens_out,
+        usage.tokens_reasoning.unwrap_or_default(),
+    );
+    print!("{}", tokens_info.blue());
 }
 
 fn print_error(e: impl ToString) {
@@ -154,4 +277,17 @@ fn copy_to_clipboard(string: String) -> anyhow::Result<()> {
 
             Err(anyhow!("`xclip` returned an error: {}", error.trim()))
         })
+}
+
+// Count up to two trailing newlines.
+fn count_trailing_newlines(mut string: String) -> u8 {
+    if string.pop() == Some('\n') {
+        if string.pop() == Some('\n') {
+            2
+        } else {
+            1
+        }
+    } else {
+        0
+    }
 }
