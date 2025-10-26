@@ -24,4 +24,6 @@
 
 pub mod client;
 pub mod context;
+pub mod error;
 pub mod openai_api;
+pub mod stream;

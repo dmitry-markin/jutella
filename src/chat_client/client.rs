@@ -24,6 +24,7 @@
 
 use crate::chat_client::{
     context::Context,
+    error::Error,
     openai_api::{
         chat_completions::{
             ChatCompletionsBody, OpenRouterReasoning, StreamOptions, StreamingChunk,
@@ -159,39 +160,6 @@ pub struct Completion {
     pub reasoning: Option<String>,
     /// Token usage.
     pub token_usage: TokenUsage,
-}
-
-/// Errors during interaction with a chatbot.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// Error reported by the model API.
-    #[error("API error: {0}")]
-    OpenAiClient(#[from] OpenAiClientError),
-    /// The response contains no completion choices.
-    #[error("Response contains no choices")]
-    NoChoices,
-    /// The response contains no message.
-    #[error("Response contains no message")]
-    NoMessage,
-    /// Message conversion error.
-    #[error("Invalid message: {0}")]
-    InvalidMessage(#[from] message::Error),
-    /// The completion response message contains no `content`.
-    #[error("Assistant message contains no `content`")]
-    NoContent,
-    /// Model refused the request.
-    #[error("Model refused the request: \"{0}\"")]
-    Refusal(String),
-    /// Tokenizer initialization error.
-    #[error("Failed to initialize tokenizer: {0}")]
-    TokenizerInit(String),
-    /// Stream error.
-    // TODO: decompose and extract transport error.
-    #[error("Stream error: {0}")]
-    StreamError(#[from] EventStreamError<reqwest::Error>),
-    /// Completion delta JSON parsing error.
-    #[error("Completion delta JSON parsing error: {0}")]
-    DeltaJsonError(#[from] serde_json::Error),
 }
 
 /// Model configuration.
