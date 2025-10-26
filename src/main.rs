@@ -78,6 +78,14 @@ async fn main() -> anyhow::Result<()> {
     chat.run().await
 }
 
+#[derive(Debug, Eq, PartialEq)]
+enum DeltaType {
+    Nothing,
+    Reasoning,
+    Content,
+    Usage,
+}
+
 struct Chat {
     client: ChatClient,
     show_reasoning: bool,
@@ -124,14 +132,47 @@ impl Chat {
             .await
             .inspect_err(|e| print_error(e))
         {
-            print!("\n{} ", "Assistant:".bold().green());
+            let mut last_delta = DeltaType::Nothing;
+            let mut first_line = true;
 
             while let Some(event) = stream.next().await {
-                if let Ok(event) = event.inspect_err(|e| print_error(e)) {
-                    if let Delta::Content(content) = event {
-                        print!("{}", content);
-                        io::stdout().flush()?;
+                if let Ok(event) = event.inspect_err(|e| {
+                    if !first_line {
+                        println!();
                     }
+                    print_error(e);
+                }) {
+                    match event {
+                        Delta::Reasoning(reasoning) => {
+                            if last_delta != DeltaType::Reasoning {
+                                last_delta = DeltaType::Reasoning;
+                                print!("{} ", "\nReasoning:".bold().blue());
+                            }
+
+                            print!("{}", reasoning);
+                            io::stdout().flush()?;
+                        }
+                        Delta::Content(content) => {
+                            if last_delta != DeltaType::Content {
+                                last_delta = DeltaType::Content;
+                                if !first_line {
+                                    println!();
+                                }
+                                print!("{} ", "\nAssistant:".bold().green());
+                            }
+
+                            print!("{}", content);
+                            io::stdout().flush()?;
+                        }
+                        Delta::Usage(usage) => {
+                            last_delta = DeltaType::Usage;
+
+                            println!();
+                            print_token_usage(usage);
+                        }
+                    }
+
+                    first_line = false;
                 }
             }
 
