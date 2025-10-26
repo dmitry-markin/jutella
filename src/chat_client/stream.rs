@@ -231,6 +231,12 @@ fn parse_stream_chunk(event: &str) -> Result<Option<Delta>, Error> {
     if let Some(reasoning) = choice.delta.reasoning {
         Ok(Some(Delta::Reasoning(reasoning)))
     } else if let Some(content) = choice.delta.content {
+        // Handle special case when OpenRouter sends usage with set but empty content string.
+        if content.is_empty() {
+            if let Some(usage) = chunk.usage {
+                return Ok(Some(Delta::Usage(usage.into())));
+            }
+        }
         Ok(Some(Delta::Content(content)))
     } else if let Some(refusal) = choice.delta.refusal {
         Err(Error::Refusal(refusal))
