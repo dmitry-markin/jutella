@@ -109,27 +109,25 @@ where
             let event = match ready!(this.stream.poll_next_unpin(cx)) {
                 Some(Ok(event)) => {
                     if event.data == "[DONE]" {
-                        this.state
-                            .finalize(State::WaitingForEndOfStream)
-                            .map(|response| {
-                                this.client.extend_context(this.request.clone(), response)
-                            });
+                        if let Some(response) = this.state.finalize(State::WaitingForEndOfStream) {
+                            this.client.extend_context(this.request.clone(), response);
+                        }
                         continue;
                     }
 
                     event
                 }
                 Some(Err(e)) => {
-                    this.state
-                        .finalize(State::Terminated)
-                        .map(|response| this.client.extend_context(this.request.clone(), response));
+                    if let Some(response) = this.state.finalize(State::Terminated) {
+                        this.client.extend_context(this.request.clone(), response);
+                    }
 
                     return Poll::Ready(Some(Err(Error::from(e))));
                 }
                 None => {
-                    this.state
-                        .finalize(State::Terminated)
-                        .map(|response| this.client.extend_context(this.request.clone(), response));
+                    if let Some(response) = this.state.finalize(State::Terminated) {
+                        this.client.extend_context(this.request.clone(), response);
+                    }
 
                     return Poll::Ready(None);
                 }
@@ -139,9 +137,9 @@ where
                 Ok(Some(delta)) => delta,
                 Ok(None) => continue,
                 Err(e) => {
-                    this.state
-                        .finalize(State::Terminated)
-                        .map(|response| this.client.extend_context(this.request.clone(), response));
+                    if let Some(response) = this.state.finalize(State::Terminated) {
+                        this.client.extend_context(this.request.clone(), response);
+                    }
 
                     return Poll::Ready(Some(Err(e)));
                 }
@@ -165,9 +163,10 @@ where
                     ref mut partial_response,
                 } => match delta {
                     Delta::Reasoning(_) => {
-                        this.state.finalize(State::Terminated).map(|response| {
-                            this.client.extend_context(this.request.clone(), response)
-                        });
+                        if let Some(response) = this.state.finalize(State::Terminated) {
+                            this.client.extend_context(this.request.clone(), response);
+                        }
+
                         return Poll::Ready(Some(Err(Error::UnexpectedStreamEvent(
                             "reasoning after content",
                         ))));
@@ -176,9 +175,9 @@ where
                         partial_response.push_str(content);
                     }
                     Delta::Usage(_) => {
-                        this.state.finalize(State::WaitingForDone).map(|response| {
-                            this.client.extend_context(this.request.clone(), response)
-                        });
+                        if let Some(response) = this.state.finalize(State::WaitingForDone) {
+                            this.client.extend_context(this.request.clone(), response);
+                        }
                     }
                 },
                 State::WaitingForDone => {
