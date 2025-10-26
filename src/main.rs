@@ -117,6 +117,7 @@ impl Chat {
 
             if self.show_token_usage {
                 print_token_usage(completion.token_usage);
+                println!("\n");
             }
         }
 
@@ -146,11 +147,16 @@ impl Chat {
                         Delta::Reasoning(reasoning) => {
                             if last_delta != DeltaType::Reasoning {
                                 last_delta = DeltaType::Reasoning;
-                                print!("{} ", "\nReasoning:".bold().blue());
+
+                                if self.show_reasoning {
+                                    print!("{} ", "\nReasoning:".bold().blue());
+                                }
                             }
 
-                            print!("{}", reasoning);
-                            io::stdout().flush()?;
+                            if self.show_reasoning {
+                                print!("{}", reasoning);
+                                io::stdout().flush()?;
+                            }
                         }
                         Delta::Content(content) => {
                             if last_delta != DeltaType::Content {
@@ -167,8 +173,10 @@ impl Chat {
                         Delta::Usage(usage) => {
                             last_delta = DeltaType::Usage;
 
-                            println!();
-                            print_token_usage(usage);
+                            if self.show_token_usage {
+                                println!("\n");
+                                print_token_usage(usage);
+                            }
                         }
                     }
 
@@ -222,7 +230,7 @@ fn print_token_usage(usage: TokenUsage) {
         usage.tokens_out,
         usage.tokens_reasoning.unwrap_or_default(),
     );
-    println!("{}\n", tokens_info.blue());
+    print!("{}", tokens_info.blue());
 }
 
 fn print_error(e: impl ToString) {
