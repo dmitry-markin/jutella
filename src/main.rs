@@ -133,6 +133,7 @@ impl Chat {
             .await
             .inspect_err(|e| print_error(e))
         {
+            let mut response = String::new();
             let mut last_delta = DeltaType::Nothing;
             // CR user entered is one newline.
             let mut trailing_newlines = 1;
@@ -170,6 +171,7 @@ impl Chat {
                             }
 
                             print!("{}", content);
+                            response.push_str(&content);
                             io::stdout().flush()?;
                         }
                         Delta::Usage(usage) => {
@@ -185,6 +187,12 @@ impl Chat {
             }
 
             println!("\n");
+
+            if self.xclip {
+                copy_to_clipboard(response)
+                    .inspect_err(|e| print_error(e))
+                    .unwrap_or_default();
+            }
         }
 
         print_prompt()?;
