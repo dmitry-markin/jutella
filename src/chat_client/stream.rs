@@ -50,7 +50,7 @@ pub enum Delta {
 enum State {
     WaitingForData,
     ReceivingReasoning,
-    ReceivingContent { partial_response: String },
+    ReceivingContent { accumulated_response: String },
     WaitingForDone,
     WaitingForEndOfStream,
     Terminated,
@@ -62,9 +62,9 @@ impl State {
         let old_state = std::mem::replace(self, new_state);
 
         match old_state {
-            Self::ReceivingContent { partial_response } => {
-                (!partial_response.is_empty()).then_some(partial_response)
-            }
+            Self::ReceivingContent {
+                accumulated_response,
+            } => (!accumulated_response.is_empty()).then_some(accumulated_response),
             _ => None,
         }
     }
@@ -152,7 +152,7 @@ where
                     }
                     Delta::Content(ref content) => {
                         this.state = State::ReceivingContent {
-                            partial_response: content.clone(),
+                            accumulated_response: content.clone(),
                         };
                     }
                     Delta::Usage(_) => {
@@ -160,7 +160,7 @@ where
                     }
                 },
                 State::ReceivingContent {
-                    ref mut partial_response,
+                    ref mut accumulated_response,
                 } => match delta {
                     Delta::Reasoning(_) => {
                         if let Some(response) = this.state.finalize(State::Terminated) {
@@ -172,7 +172,7 @@ where
                         ))));
                     }
                     Delta::Content(ref content) => {
-                        partial_response.push_str(content);
+                        accumulated_response.push_str(content);
                     }
                     Delta::Usage(_) => {
                         if let Some(response) = this.state.finalize(State::WaitingForDone) {
