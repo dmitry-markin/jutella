@@ -26,20 +26,15 @@ use crate::chat_client::{
     context::Context,
     error::Error,
     openai_api::{
-        chat_completions::{
-            ChatCompletionsBody, OpenRouterReasoning, StreamOptions, StreamingChunk,
-        },
-        client::{Auth, Error as OpenAiClientError, OpenAiClient, OpenAiClientConfig},
-        message::{self, AssistantMessage},
+        chat_completions::{ChatCompletionsBody, OpenRouterReasoning, StreamOptions, Usage},
+        client::{Auth, OpenAiClient, OpenAiClientConfig},
+        message::AssistantMessage,
     },
+    stream::CompletionStream,
 };
-use eventsource_stream::{Event, EventStream, EventStreamError};
-use futures::{
-    ready,
-    stream::{Stream, StreamExt},
-    task::Poll,
-};
-use std::{pin::Pin, time::Duration};
+use eventsource_stream::{Event, EventStreamError};
+use futures::stream::Stream;
+use std::time::Duration;
 
 /// OpenRouter reasoning settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,6 +146,19 @@ pub struct TokenUsage {
     pub tokens_reasoning: Option<usize>,
 }
 
+impl From<Usage> for TokenUsage {
+    fn from(usage: Usage) -> Self {
+        Self {
+            tokens_in: usage.prompt_tokens,
+            tokens_in_cached: usage.prompt_tokens_details.and_then(|d| d.cached_tokens),
+            tokens_out: usage.completion_tokens,
+            tokens_reasoning: usage
+                .completion_tokens_details
+                .and_then(|d| d.reasoning_tokens),
+        }
+    }
+}
+
 /// Generated completion.
 #[derive(Debug)]
 pub struct Completion {
@@ -251,23 +259,12 @@ impl ChatClient {
 
         // TODO: we likely need to count tokens used in case of errors as well.
 
-        self.context.push(request, response.clone());
+        self.extend_context(request, response.clone());
 
         Ok(Completion {
             response,
             reasoning: assistant_message.reasoning,
-            token_usage: TokenUsage {
-                tokens_in: completion.usage.prompt_tokens,
-                tokens_in_cached: completion
-                    .usage
-                    .prompt_tokens_details
-                    .and_then(|d| d.cached_tokens),
-                tokens_out: completion.usage.completion_tokens,
-                tokens_reasoning: completion
-                    .usage
-                    .completion_tokens_details
-                    .and_then(|d| d.reasoning_tokens),
-            },
+            token_usage: completion.usage.into(),
         })
     }
 
@@ -289,11 +286,11 @@ impl ChatClient {
             ))
             .await?;
 
-        Ok(CompletionStream {
-            client: self,
-            stream,
-            terminated: false,
-        })
+        Ok(CompletionStream::new(self, stream, request))
+    }
+
+    pub(crate) fn extend_context(&mut self, request: String, response: String) {
+        self.context.push(request, response);
     }
 
     /// Construct a request body.
@@ -348,72 +345,4 @@ fn create_context(
     };
 
     Ok(context)
-}
-
-/// Chat completion delta event.
-pub enum Delta {
-    /// Assistant response delta.
-    Content(String),
-    /// Reasoning delta. Returned before the content.
-    Reasoning(String),
-    /// Token usage info. Always the last event.
-    TokenUsage(TokenUsage),
-}
-
-/// Stream returned by [`ChatClient::stream_completion`].
-pub struct CompletionStream<'a, S> {
-    client: &'a mut ChatClient,
-    stream: S,
-    terminated: bool,
-}
-
-impl<'a, S> Stream for CompletionStream<'a, S>
-where
-    S: Stream<Item = Result<Event, EventStreamError<reqwest::Error>>> + Unpin,
-{
-    type Item = Result<Delta, Error>;
-
-    fn poll_next(
-        self: Pin<&mut Self>,
-        cx: &mut futures::task::Context,
-    ) -> Poll<Option<Self::Item>> {
-        let this = self.get_mut();
-
-        if this.terminated {
-            return Poll::Ready(None);
-        }
-
-        match ready!(this.stream.poll_next_unpin(cx)) {
-            Some(Ok(event)) => {
-                if event.data == "[DONE]" {
-                    this.terminated = true;
-
-                    return Poll::Ready(None);
-                    // TODO: poll underlying stream to give it a chance to clean up.
-                }
-
-                // TODO: extend context.
-                Poll::Ready(Some(parse_stream_chunk(&event.data)))
-            }
-            Some(Err(e)) => {
-                this.terminated = true;
-
-                Poll::Ready(Some(Err(Error::from(e))))
-            }
-            None => {
-                this.terminated = true;
-
-                Poll::Ready(None)
-            }
-        }
-    }
-}
-
-fn parse_stream_chunk(event: &str) -> Result<Delta, Error> {
-    let mut chunk: StreamingChunk = serde_json::from_str(event)?;
-
-    // TODO: proper error handling.
-    // TODO: reasoning parsing.
-    // TODO: token usage parsing.
-    Ok(Delta::Content(chunk.choices.pop().unwrap().delta.content))
 }

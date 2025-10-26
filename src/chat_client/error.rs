@@ -53,4 +53,7 @@ pub enum Error {
     /// Completion delta JSON parsing error.
     #[error("Completion delta JSON parsing error: {0}")]
     DeltaJsonError(#[from] serde_json::Error),
+    /// Reasoning delta after content.
+    #[error("Unexpected stream event: {0}")]
+    UnexpectedStreamEvent(&'static str),
 }
