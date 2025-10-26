@@ -134,13 +134,12 @@ impl Chat {
             .inspect_err(|e| print_error(e))
         {
             let mut last_delta = DeltaType::Nothing;
-            let mut first_line = true;
+            // CR user entered is one newline.
+            let mut trailing_newlines = 1;
 
             while let Some(event) = stream.next().await {
                 if let Ok(event) = event.inspect_err(|e| {
-                    if !first_line {
-                        println!();
-                    }
+                    println!();
                     print_error(e);
                 }) {
                     match event {
@@ -155,16 +154,19 @@ impl Chat {
 
                             if self.show_reasoning {
                                 print!("{}", reasoning);
+                                trailing_newlines = count_trailing_newlines(reasoning);
                                 io::stdout().flush()?;
                             }
                         }
                         Delta::Content(content) => {
                             if last_delta != DeltaType::Content {
                                 last_delta = DeltaType::Content;
-                                if !first_line {
+
+                                for _ in 0..2 - trailing_newlines {
                                     println!();
                                 }
-                                print!("{} ", "\nAssistant:".bold().green());
+
+                                print!("{} ", "Assistant:".bold().green());
                             }
 
                             print!("{}", content);
@@ -179,8 +181,6 @@ impl Chat {
                             }
                         }
                     }
-
-                    first_line = false;
                 }
             }
 
@@ -269,4 +269,17 @@ fn copy_to_clipboard(string: String) -> anyhow::Result<()> {
 
             Err(anyhow!("`xclip` returned an error: {}", error.trim()))
         })
+}
+
+// Count up to two trailing newlines.
+fn count_trailing_newlines(mut string: String) -> u8 {
+    if string.pop() == Some('\n') {
+        if string.pop() == Some('\n') {
+            2
+        } else {
+            1
+        }
+    } else {
+        0
+    }
 }
