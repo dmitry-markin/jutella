@@ -31,7 +31,7 @@ use std::{fs, path::PathBuf, time::Duration};
 const HOME_CONFIG_LOCATION: &str = ".config/jutella.toml";
 const DEFAULT_ENDPOINT: &str = "https://api.openai.com/v1/";
 const DEFAULT_MODEL: &str = "gpt-4o-mini";
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(300);
+const DEFAULT_HTTP_TIMEOUT: Duration = Duration::from_secs(300);
 
 /// API to use.
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -134,7 +134,7 @@ struct ConfigFile {
     api_version: Option<String>,
     api_key: Option<String>,
     api_token: Option<String>,
-    timeout: Option<u64>,
+    http_timeout: Option<u64>,
     model: Option<String>,
     system_message: Option<String>,
     stream: Option<bool>,
@@ -153,7 +153,7 @@ pub struct Configuration {
     pub api_options: jutella::ApiOptions,
     pub api_version: Option<String>,
     pub auth: Auth,
-    pub timeout: Duration,
+    pub http_timeout: Duration,
     pub model: String,
     pub system_message: Option<String>,
     pub stream: bool,
@@ -230,10 +230,10 @@ impl Configuration {
 
         let api_version = api_version.or(config.api_version);
 
-        let timeout = config
-            .timeout
+        let http_timeout = config
+            .http_timeout
             .map(Duration::from_secs)
-            .unwrap_or(DEFAULT_TIMEOUT);
+            .unwrap_or(DEFAULT_HTTP_TIMEOUT);
 
         let model = model
             .or(config.model)
@@ -283,7 +283,7 @@ impl Configuration {
             api_options,
             api_version,
             auth,
-            timeout,
+            http_timeout,
             model,
             system_message,
             stream,

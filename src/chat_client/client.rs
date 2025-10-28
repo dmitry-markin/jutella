@@ -92,7 +92,7 @@ pub struct ChatClientConfig {
     /// API version.
     pub api_version: Option<String>,
     /// HTTP request timeout.
-    pub timeout: Duration,
+    pub http_timeout: Duration,
     /// Model.
     pub model: String,
     /// System message to initialize the model.
@@ -123,7 +123,7 @@ impl ChatClientConfig {
                 reasoning_effort: None,
             },
             api_version: None,
-            timeout: Duration::from_secs(300),
+            http_timeout: Duration::from_secs(300),
             model: String::from("gpt-4o-mini"),
             system_message: None,
             min_history_tokens: None,
@@ -217,7 +217,7 @@ impl ChatClient {
             api_url,
             api_options,
             api_version,
-            timeout,
+            http_timeout,
             model,
             system_message,
             min_history_tokens,
@@ -230,7 +230,7 @@ impl ChatClient {
             auth,
             base_url: ensure_trailing_slash(api_url),
             api_version,
-            timeout,
+            timeout: http_timeout,
         })?;
 
         let context = if min_history_tokens.is_some() || max_history_tokens.is_some() {
