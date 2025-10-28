@@ -26,13 +26,14 @@ use crate::chat_client::openai_api::message::{
     AssistantMessage, Message, SystemMessage, UserMessage,
 };
 use iter_accumulate::IterAccumulate;
+use std::sync::Arc;
 
 /// Chatbot context.
 #[derive(Default, Clone)]
 pub struct Context {
     system_message: Option<String>,
     conversation: Vec<(String, String)>,
-    tokenizer: Option<tiktoken_rs::CoreBPE>,
+    tokenizer: Option<Arc<tiktoken_rs::CoreBPE>>,
     min_history_tokens: Option<usize>,
     max_history_tokens: Option<usize>,
 }
@@ -52,7 +53,7 @@ impl Context {
     /// Create a new chat context wth tokenizer.
     pub fn new_with_rolling_window(
         system_message: Option<String>,
-        tokenizer: tiktoken_rs::CoreBPE,
+        tokenizer: Arc<tiktoken_rs::CoreBPE>,
         min_history_tokens: Option<usize>,
         max_history_tokens: Option<usize>,
     ) -> Self {

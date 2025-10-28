@@ -34,7 +34,7 @@ use crate::chat_client::{
 };
 use eventsource_stream::{Event, EventStreamError};
 use futures::stream::Stream;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 /// OpenRouter reasoning settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,7 +92,7 @@ pub struct ChatClientConfig {
     /// API version.
     pub api_version: Option<String>,
     /// HTTP request timeout.
-    pub timeout: Duration,
+    pub http_timeout: Duration,
     /// Model.
     pub model: String,
     /// System message to initialize the model.
@@ -123,7 +123,7 @@ impl ChatClientConfig {
                 reasoning_effort: None,
             },
             api_version: None,
-            timeout: Duration::from_secs(300),
+            http_timeout: Duration::from_secs(300),
             model: String::from("gpt-4o-mini"),
             system_message: None,
             min_history_tokens: None,
@@ -191,20 +191,33 @@ impl ChatClient {
         Self::new_with_client(config, reqwest::Client::new())
     }
 
-    /// Cretae new [`ChatClient`] accessing OpenAI chat API with preconfigured [`reqwest::Client`].
-    ///
-    /// Make sure to setup a header `Authorization: Bearer {api_key}` if using OpenAI endpoints,
-    /// or `api-key: {api_key}` header if using Azure endpoints.
+    /// Create new [`ChatClient`] accessing OpenAI chat API sharing existing [`reqwest::Client`].
     pub fn new_with_client(
         config: ChatClientConfig,
         client: reqwest::Client,
+    ) -> Result<Self, Error> {
+        let tokenizer =
+            tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?;
+
+        Self::new_with_client_and_tokenizer(config, client, Arc::new(tokenizer))
+    }
+
+    /// Create new [`ChatClient`] accessing OpenAI chat API sharing existing [`reqwest::Client`]
+    /// and tokenizer.
+    ///
+    /// Sharing tokenizer between multiple chat instances helps reduce memory footprint (every
+    /// tokenizer instance uses ~50MiB of RAM).
+    pub fn new_with_client_and_tokenizer(
+        config: ChatClientConfig,
+        client: reqwest::Client,
+        tokenizer: Arc<tiktoken_rs::CoreBPE>,
     ) -> Result<Self, Error> {
         let ChatClientConfig {
             auth,
             api_url,
             api_options,
             api_version,
-            timeout,
+            http_timeout,
             model,
             system_message,
             min_history_tokens,
@@ -217,9 +230,19 @@ impl ChatClient {
             auth,
             base_url: ensure_trailing_slash(api_url),
             api_version,
-            timeout,
+            timeout: http_timeout,
         })?;
-        let context = create_context(system_message, min_history_tokens, max_history_tokens)?;
+
+        let context = if min_history_tokens.is_some() || max_history_tokens.is_some() {
+            Context::new_with_rolling_window(
+                system_message,
+                tokenizer,
+                min_history_tokens,
+                max_history_tokens,
+            )
+        } else {
+            Context::new(system_message)
+        };
 
         Ok(Self {
             client,
@@ -257,7 +280,7 @@ impl ChatClient {
                 .map_or(Error::NoContent, Error::Refusal),
         )?;
 
-        // TODO: we likely need to count tokens used in case of errors as well.
+        // TODO: we likely need to report tokens used in case of errors as well.
 
         self.extend_context(request, response.clone());
 
@@ -326,23 +349,4 @@ fn ensure_trailing_slash(url: String) -> String {
     } else {
         url + "/"
     }
-}
-
-fn create_context(
-    system_message: Option<String>,
-    min_history_tokens: Option<usize>,
-    max_history_tokens: Option<usize>,
-) -> Result<Context, Error> {
-    let context = if min_history_tokens.is_some() || max_history_tokens.is_some() {
-        Context::new_with_rolling_window(
-            system_message,
-            tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?,
-            min_history_tokens,
-            max_history_tokens,
-        )
-    } else {
-        Context::new(system_message)
-    };
-
-    Ok(context)
 }

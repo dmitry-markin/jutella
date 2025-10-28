@@ -38,7 +38,7 @@ const CHAT_COMPLETIONS_ENDPOINT: &str = "chat/completions";
 /// Authorization header.
 ///
 /// Use `HeaderMap::try_from(auth)` to convert to `reqwest` headers.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Auth {
     /// Auth header `Authorization: Bearer {api_token}`.
     Token(String),
