@@ -15,7 +15,7 @@ api_token = "<API token>"
 #api_version = "2023-03-15-preview"
 
 # HTTP request timeout in seconds. 5 mins by default.
-#timeout = 300
+#http_timeout = 300
 
 # Model to use.
 model = "gpt-4o-mini"
