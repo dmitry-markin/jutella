@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn min_history_tokens() {
-        let tokenizer = tiktoken_rs::o200k_base().unwrap();
+        let tokenizer = Arc::new(tiktoken_rs::o200k_base().unwrap());
         let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
         let system = "to to to to to".to_string();
         let request = "do do do do do".to_string();
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn min_history_tokens_exact() {
-        let tokenizer = tiktoken_rs::o200k_base().unwrap();
+        let tokenizer = Arc::new(tiktoken_rs::o200k_base().unwrap());
         let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
         let request = "do do do do do".to_string();
         let response = "be be be be be".to_string();
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn max_history_tokens() {
-        let tokenizer = tiktoken_rs::o200k_base().unwrap();
+        let tokenizer = Arc::new(tiktoken_rs::o200k_base().unwrap());
         let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
         let system = "to to to to to".to_string();
         let request = "do do do do do".to_string();
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn max_history_tokens_exact() {
-        let tokenizer = tiktoken_rs::o200k_base().unwrap();
+        let tokenizer = Arc::new(tiktoken_rs::o200k_base().unwrap());
         let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
         let request = "do do do do do".to_string();
         let response = "be be be be be".to_string();
