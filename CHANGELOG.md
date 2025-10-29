@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2025-10-29
+
+This release allows a tokenizer to be shared across chat instances. This reduces a memory footprint by approximately 50 MB per chat instance. Additionally, the API is extended to support response streaming.
+
+### Added
+
+- Response streaming ([#20](https://github.com/dmitry-markin/jutella/pull/20))
+
+### Changed
+
+- Bump dependencies to the latest versions ([#22](https://github.com/dmitry-markin/jutella/pull/22))
+- Allow sharing tokenizer across chat instances ([#21](https://github.com/dmitry-markin/jutella/pull/21))
+- Allow reusing generic `reqwest::Client` & expose HTTP timeout setting ([#19](https://github.com/dmitry-markin/jutella/pull/19))
+
 ## [0.6.0] - 2025-09-09
 
 This release adds support for getting reasoning summaries and setting `reasoning_budget` when using OpenRouter API.
