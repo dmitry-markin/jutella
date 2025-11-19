@@ -51,6 +51,7 @@ async fn main() -> anyhow::Result<()> {
         min_history_tokens,
         max_history_tokens,
         verbosity,
+        sanitize_links,
     } = Configuration::init(Args::parse())?;
 
     let client = ChatClient::new(ChatClientConfig {
@@ -64,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
         min_history_tokens,
         max_history_tokens,
         verbosity,
+        sanitize_links,
     })
     .context("Failed to initialize the client")?;
 

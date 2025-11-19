@@ -896,6 +896,7 @@ dependencies = [
  "eventsource-stream",
  "futures",
  "iter_accumulate",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

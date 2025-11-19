@@ -34,6 +34,7 @@ use crate::chat_client::{
 };
 use eventsource_stream::{Event, EventStreamError};
 use futures::stream::Stream;
+use regex::Regex;
 use std::{sync::Arc, time::Duration};
 
 /// OpenRouter reasoning settings.
@@ -111,6 +112,8 @@ pub struct ChatClientConfig {
     ///
     /// Typical values are: `low`, `medium`, and `high`.
     pub verbosity: Option<String>,
+    /// Sanitize links, removing analytics GET parameters. Does nothing in streaming mode.
+    pub sanitize_links: bool,
 }
 
 impl ChatClientConfig {
@@ -129,6 +132,7 @@ impl ChatClientConfig {
             min_history_tokens: None,
             max_history_tokens: None,
             verbosity: None,
+            sanitize_links: false,
         }
     }
 }
@@ -183,6 +187,8 @@ pub struct ChatClient {
     client: OpenAiClient,
     model_config: ModelConfig,
     context: Context,
+    sanitize_links: bool,
+    sanitize_re: regex::Regex,
 }
 
 impl ChatClient {
@@ -223,6 +229,7 @@ impl ChatClient {
             min_history_tokens,
             max_history_tokens,
             verbosity,
+            sanitize_links,
         } = config;
 
         let client = OpenAiClient::new(OpenAiClientConfig {
@@ -244,6 +251,9 @@ impl ChatClient {
             Context::new(system_message)
         };
 
+        // Note closing ")" — we rely on the fact that openai utm parameter is appended last.
+        let sanitize_re = Regex::new(r"(?:\?|\&)utm_source=openai\)").expect("to be valid regex");
+
         Ok(Self {
             client,
             model_config: ModelConfig {
@@ -252,6 +262,8 @@ impl ChatClient {
                 verbosity,
             },
             context,
+            sanitize_links,
+            sanitize_re,
         })
     }
 
@@ -274,11 +286,14 @@ impl ChatClient {
 
         let choice = completion.choices.pop().ok_or(Error::NoChoices)?;
         let assistant_message = AssistantMessage::try_from(choice.message)?;
-        let response = assistant_message.content.ok_or(
-            assistant_message
-                .refusal
-                .map_or(Error::NoContent, Error::Refusal),
-        )?;
+        let response = assistant_message
+            .content
+            .map(|response| self.sanitize_links(response))
+            .ok_or(
+                assistant_message
+                    .refusal
+                    .map_or(Error::NoContent, Error::Refusal),
+            )?;
 
         // TODO: we likely need to report tokens used in case of errors as well.
 
@@ -339,6 +354,14 @@ impl ChatClient {
                 include_usage: Some(true),
             }),
             ..Default::default()
+        }
+    }
+
+    fn sanitize_links(&self, response: String) -> String {
+        if self.sanitize_links {
+            self.sanitize_re.replace_all(&response, ")").to_string()
+        } else {
+            response
         }
     }
 }

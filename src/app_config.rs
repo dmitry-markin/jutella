@@ -146,6 +146,7 @@ struct ConfigFile {
     reasoning_effort: Option<String>,
     reasoning_budget: Option<i64>,
     verbosity: Option<String>,
+    sanitize_links: Option<bool>,
 }
 
 pub struct Configuration {
@@ -163,6 +164,7 @@ pub struct Configuration {
     pub show_token_usage: bool,
     pub show_reasoning: bool,
     pub verbosity: Option<String>,
+    pub sanitize_links: bool,
 }
 
 impl Configuration {
@@ -277,6 +279,7 @@ impl Configuration {
         };
 
         let verbosity = verbosity.or(config.verbosity);
+        let sanitize_links = config.sanitize_links.unwrap_or_default();
 
         Ok(Self {
             api_url,
@@ -293,6 +296,7 @@ impl Configuration {
             show_token_usage,
             show_reasoning,
             verbosity,
+            sanitize_links,
         })
     }
 }
