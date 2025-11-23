@@ -60,6 +60,6 @@ max_history_tokens = 2500
 # Sanitize links. Currently strips `utm_source=openai` GET parameter from links in the response.
 #sanitize_links = false
 
-# Optional OpenRouter PDF engine. Typically one of `native`, `mistral-ocr`, `pdf-text`.
+# Enable OpenRouter PDF engine. Typically one of `native`, `mistral-ocr`, `pdf-text`.
 # Will be ignored with `openai` API.
 #openrouter_pdf_engine = "native"
