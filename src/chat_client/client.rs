@@ -35,7 +35,7 @@ use crate::chat_client::{
 use eventsource_stream::{Event, EventStreamError};
 use futures::stream::Stream;
 use regex::Regex;
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 /// OpenRouter reasoning settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,6 +98,14 @@ pub struct ChatClientConfig {
     pub model: String,
     /// System message to initialize the model.
     pub system_message: Option<String>,
+    /// Optional system message token count.
+    ///
+    /// If passed, tokenizer won't be instantiated to measure system
+    /// message. This reduces RAM usage by approx. 50MiB on startup.
+    ///
+    /// Note that tokenizer is only used on startup in any case —
+    /// API provided token info is used to measure user and model messages during operation.
+    pub system_tokens_measurement: Option<usize>,
     /// Min history tokens to keep in the conversation context.
     ///
     /// The context will be truncated to keep at least `min_history_tokens`, but
@@ -129,6 +137,7 @@ impl ChatClientConfig {
             http_timeout: Duration::from_secs(300),
             model: String::from("gpt-4o-mini"),
             system_message: None,
+            system_tokens_measurement: None,
             min_history_tokens: None,
             max_history_tokens: None,
             verbosity: None,
@@ -138,13 +147,13 @@ impl ChatClientConfig {
 }
 
 /// Token usage info.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TokenUsage {
     /// Input tokens used.
     pub tokens_in: usize,
     /// Cached input tokens, if returned by the API.
     pub tokens_in_cached: Option<usize>,
-    /// Output tokens used.
+    /// Output tokens used, including reasoning tokens.
     pub tokens_out: usize,
     /// Reasoning tokens used, if returned by the API.
     pub tokens_reasoning: Option<usize>,
@@ -189,7 +198,6 @@ pub struct ChatClient {
     context: Context,
     sanitize_links: bool,
     sanitize_re: regex::Regex,
-    tokenizer: Arc<tiktoken_rs::CoreBPE>,
 }
 
 impl ChatClient {
@@ -203,22 +211,6 @@ impl ChatClient {
         config: ChatClientConfig,
         client: reqwest::Client,
     ) -> Result<Self, Error> {
-        let tokenizer =
-            tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?;
-
-        Self::new_with_client_and_tokenizer(config, client, Arc::new(tokenizer))
-    }
-
-    /// Create new [`ChatClient`] accessing OpenAI chat API sharing existing [`reqwest::Client`]
-    /// and tokenizer.
-    ///
-    /// Sharing tokenizer between multiple chat instances helps reduce memory footprint (every
-    /// tokenizer instance uses ~50MiB of RAM).
-    pub fn new_with_client_and_tokenizer(
-        config: ChatClientConfig,
-        client: reqwest::Client,
-        tokenizer: Arc<tiktoken_rs::CoreBPE>,
-    ) -> Result<Self, Error> {
         let ChatClientConfig {
             auth,
             api_url,
@@ -227,6 +219,7 @@ impl ChatClient {
             http_timeout,
             model,
             system_message,
+            system_tokens_measurement,
             min_history_tokens,
             max_history_tokens,
             verbosity,
@@ -241,10 +234,15 @@ impl ChatClient {
             timeout: http_timeout,
         })?;
 
-        let system_tokens = system_message
-            .as_ref()
-            .map(|m| tokenizer.encode_with_special_tokens(m).len())
-            .unwrap_or_default();
+        let system_tokens = match (&system_message, system_tokens_measurement) {
+            (Some(_), Some(system_tokens)) => system_tokens,
+            (Some(ref system_message), None) => {
+                let tokenizer =
+                    tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?;
+                tokenizer.encode_with_special_tokens(system_message).len()
+            }
+            _ => 0,
+        };
 
         let context = Context::new(
             system_message,
@@ -266,7 +264,6 @@ impl ChatClient {
             context,
             sanitize_links,
             sanitize_re,
-            tokenizer,
         })
     }
 
@@ -300,12 +297,13 @@ impl ChatClient {
 
         // TODO: we likely need to report tokens used in case of errors as well.
 
-        self.extend_context(request, response.clone());
+        let token_usage = completion.usage.into();
+        self.extend_context(request, response.clone(), &token_usage);
 
         Ok(Completion {
             response,
             reasoning: assistant_message.reasoning,
-            token_usage: completion.usage.into(),
+            token_usage,
         })
     }
 
@@ -330,11 +328,16 @@ impl ChatClient {
         Ok(CompletionStream::new(self, stream, request))
     }
 
-    pub(crate) fn extend_context(&mut self, request: String, response: String) {
-        let num_tokens = |m| self.tokenizer.encode_with_special_tokens(m).len();
-        let tokens = num_tokens(&request) + num_tokens(&response);
+    pub(crate) fn extend_context(&mut self, request: String, response: String, usage: &TokenUsage) {
+        // TODO: log warning if context tokens > `tokens_in`.
+        let request_tokens = usage.tokens_in.saturating_sub(self.context.tokens());
+        // TODO: log warning if `reasoning_tokens` > `completion_tokens`.
+        let response_tokens = usage
+            .tokens_out
+            .saturating_sub(usage.tokens_reasoning.unwrap_or_default());
 
-        self.context.push(request, response, tokens);
+        self.context
+            .push(request, response.clone(), request_tokens + response_tokens);
     }
 
     /// Construct a request body.

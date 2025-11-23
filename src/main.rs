@@ -62,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
         http_timeout,
         model,
         system_message,
+        system_tokens_measurement: None,
         min_history_tokens,
         max_history_tokens,
         verbosity,

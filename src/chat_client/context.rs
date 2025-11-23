@@ -75,6 +75,16 @@ impl Context {
         self.keep_recent();
     }
 
+    /// Size of the context in tokens.
+    pub fn tokens(&self) -> usize {
+        self.system_message_tokens
+            + self
+                .conversation
+                .iter()
+                .map(|(_, _, tokens)| tokens)
+                .sum::<usize>()
+    }
+
     /// Discard old records to keep the context within the limits.
     fn keep_recent(&mut self) {
         if self.min_history_tokens.is_none() && self.max_history_tokens.is_none() {
