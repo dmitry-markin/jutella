@@ -35,7 +35,7 @@ use crate::chat_client::{
 use eventsource_stream::{Event, EventStreamError};
 use futures::stream::Stream;
 use regex::Regex;
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 /// OpenRouter reasoning settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -138,13 +138,13 @@ impl ChatClientConfig {
 }
 
 /// Token usage info.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TokenUsage {
     /// Input tokens used.
     pub tokens_in: usize,
     /// Cached input tokens, if returned by the API.
     pub tokens_in_cached: Option<usize>,
-    /// Output tokens used.
+    /// Output tokens used, including reasoning tokens.
     pub tokens_out: usize,
     /// Reasoning tokens used, if returned by the API.
     pub tokens_reasoning: Option<usize>,
@@ -202,21 +202,27 @@ impl ChatClient {
         config: ChatClientConfig,
         client: reqwest::Client,
     ) -> Result<Self, Error> {
-        let tokenizer =
-            tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?;
+        let system_tokens = match config.system_message {
+            None => 0,
+            Some(ref system_message) => {
+                let tokenizer =
+                    tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?;
+                tokenizer.encode_with_special_tokens(system_message).len()
+            }
+        };
 
-        Self::new_with_client_and_tokenizer(config, client, Arc::new(tokenizer))
+        Self::new_with_client_and_system_tokens(config, client, system_tokens)
     }
 
     /// Create new [`ChatClient`] accessing OpenAI chat API sharing existing [`reqwest::Client`]
-    /// and tokenizer.
+    /// and pass the system token count.
     ///
-    /// Sharing tokenizer between multiple chat instances helps reduce memory footprint (every
-    /// tokenizer instance uses ~50MiB of RAM).
-    pub fn new_with_client_and_tokenizer(
+    /// When this constructor iis used, tokenizer is not instantiated, saving ~50 MB of RAM on
+    /// startup.
+    pub fn new_with_client_and_system_tokens(
         config: ChatClientConfig,
         client: reqwest::Client,
-        tokenizer: Arc<tiktoken_rs::CoreBPE>,
+        system_tokens: usize,
     ) -> Result<Self, Error> {
         let ChatClientConfig {
             auth,
@@ -240,16 +246,12 @@ impl ChatClient {
             timeout: http_timeout,
         })?;
 
-        let context = if min_history_tokens.is_some() || max_history_tokens.is_some() {
-            Context::new_with_rolling_window(
-                system_message,
-                tokenizer,
-                min_history_tokens,
-                max_history_tokens,
-            )
-        } else {
-            Context::new(system_message)
-        };
+        let context = Context::new(
+            system_message,
+            system_tokens,
+            min_history_tokens,
+            max_history_tokens,
+        );
 
         // Note closing ")" — we rely on the fact that openai utm parameter is appended last.
         let sanitize_re = Regex::new(r"(?:\?|\&)utm_source=openai\)").expect("to be valid regex");
@@ -297,12 +299,13 @@ impl ChatClient {
 
         // TODO: we likely need to report tokens used in case of errors as well.
 
-        self.extend_context(request, response.clone());
+        let token_usage = completion.usage.into();
+        self.extend_context(request, response.clone(), &token_usage);
 
         Ok(Completion {
             response,
             reasoning: assistant_message.reasoning,
-            token_usage: completion.usage.into(),
+            token_usage,
         })
     }
 
@@ -327,8 +330,16 @@ impl ChatClient {
         Ok(CompletionStream::new(self, stream, request))
     }
 
-    pub(crate) fn extend_context(&mut self, request: String, response: String) {
-        self.context.push(request, response);
+    pub(crate) fn extend_context(&mut self, request: String, response: String, usage: &TokenUsage) {
+        // TODO: log warning if context tokens > `tokens_in`.
+        let request_tokens = usage.tokens_in.saturating_sub(self.context.tokens());
+        // TODO: log warning if `reasoning_tokens` > `completion_tokens`.
+        let response_tokens = usage
+            .tokens_out
+            .saturating_sub(usage.tokens_reasoning.unwrap_or_default());
+
+        self.context
+            .push(request, response.clone(), request_tokens + response_tokens);
     }
 
     /// Construct a request body.

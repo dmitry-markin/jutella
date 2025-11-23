@@ -105,12 +105,20 @@ where
             return Poll::Ready(None);
         }
 
+        // FIXME: all early terminations extend context, but do not pass the correct token usage.
+        //        This will lead to messages in the context having incorrect token estimations.
+        //        May be we shouldn't extend the context after abnormal termination?
+
         loop {
             let event = match ready!(this.stream.poll_next_unpin(cx)) {
                 Some(Ok(event)) => {
                     if event.data == "[DONE]" {
                         if let Some(response) = this.state.finalize(State::WaitingForEndOfStream) {
-                            this.client.extend_context(this.request.clone(), response);
+                            this.client.extend_context(
+                                this.request.clone(),
+                                response,
+                                &Default::default(),
+                            );
                         }
                         continue;
                     }
@@ -119,14 +127,22 @@ where
                 }
                 Some(Err(e)) => {
                     if let Some(response) = this.state.finalize(State::Terminated) {
-                        this.client.extend_context(this.request.clone(), response);
+                        this.client.extend_context(
+                            this.request.clone(),
+                            response,
+                            &Default::default(),
+                        );
                     }
 
                     return Poll::Ready(Some(Err(Error::from(e))));
                 }
                 None => {
                     if let Some(response) = this.state.finalize(State::Terminated) {
-                        this.client.extend_context(this.request.clone(), response);
+                        this.client.extend_context(
+                            this.request.clone(),
+                            response,
+                            &Default::default(),
+                        );
                     }
 
                     return Poll::Ready(None);
@@ -138,7 +154,11 @@ where
                 Ok(None) => continue,
                 Err(e) => {
                     if let Some(response) = this.state.finalize(State::Terminated) {
-                        this.client.extend_context(this.request.clone(), response);
+                        this.client.extend_context(
+                            this.request.clone(),
+                            response,
+                            &Default::default(),
+                        );
                     }
 
                     return Poll::Ready(Some(Err(e)));
@@ -164,7 +184,11 @@ where
                 } => match delta {
                     Delta::Reasoning(_) => {
                         if let Some(response) = this.state.finalize(State::Terminated) {
-                            this.client.extend_context(this.request.clone(), response);
+                            this.client.extend_context(
+                                this.request.clone(),
+                                response,
+                                &Default::default(),
+                            );
                         }
 
                         return Poll::Ready(Some(Err(Error::UnexpectedStreamEvent(
@@ -174,9 +198,12 @@ where
                     Delta::Content(ref content) => {
                         accumulated_response.push_str(content);
                     }
-                    Delta::Usage(_) => {
+                    Delta::Usage(ref usage) => {
                         if let Some(response) = this.state.finalize(State::WaitingForDone) {
-                            this.client.extend_context(this.request.clone(), response);
+                            // This is the branch taken during normal operation.
+                            // TODO: log warnings in all the other cases.
+                            this.client
+                                .extend_context(this.request.clone(), response, usage);
                         }
                     }
                 },
