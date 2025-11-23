@@ -278,7 +278,8 @@ impl From<ToolMessage> for RequestGenericMessage {
 /// Image part in a multi-part user message.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct ImagePart {
-    /// Image URL or base64 encoded image data.
+    /// Image URL or base64-encoded image data in the following format:
+    /// `data:{mime_type};base64,{base64_image}`.
     pub url: String,
     /// Image detail level. Typically one of `auto`, `low`, `high`.
     pub detail: Option<String>,
@@ -287,7 +288,8 @@ pub struct ImagePart {
 /// File part in a multi-part user message.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct FilePart {
-    /// Base64-encoded file data.
+    /// File URL (only supported by OpenRouter) or base64-encoded file data in the following
+    /// format: `data:application/pdf;base64,{base64_pdf}`.
     pub file_data: String,
     /// File name to pass to the model.
     pub filename: Option<String>,
