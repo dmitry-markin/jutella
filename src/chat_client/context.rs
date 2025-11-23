@@ -26,43 +26,29 @@ use crate::chat_client::openai_api::message::{
     AssistantMessage, Message, SystemMessage, UserMessage,
 };
 use iter_accumulate::IterAccumulate;
-use std::sync::Arc;
 
 /// Chatbot context.
 #[derive(Default, Clone)]
 pub struct Context {
     system_message: Option<String>,
-    conversation: Vec<(String, String)>,
-    tokenizer: Option<Arc<tiktoken_rs::CoreBPE>>,
+    system_message_tokens: usize,
+    conversation: Vec<(String, String, usize)>,
     min_history_tokens: Option<usize>,
     max_history_tokens: Option<usize>,
 }
 
 impl Context {
     /// Create a new chat context.
-    pub fn new(system_message: Option<String>) -> Self {
-        Self {
-            system_message,
-            conversation: Vec::new(),
-            tokenizer: None,
-            min_history_tokens: None,
-            max_history_tokens: None,
-        }
-    }
-
-    /// Create a new chat context wth tokenizer.
-    pub fn new_with_rolling_window(
+    pub fn new(
         system_message: Option<String>,
-        tokenizer: Arc<tiktoken_rs::CoreBPE>,
+        system_message_tokens: usize,
         min_history_tokens: Option<usize>,
         max_history_tokens: Option<usize>,
     ) -> Self {
-        debug_assert!(min_history_tokens.is_some() || max_history_tokens.is_some());
-
         Self {
             system_message,
+            system_message_tokens,
             conversation: Vec::new(),
-            tokenizer: Some(tokenizer),
             min_history_tokens,
             max_history_tokens,
         }
@@ -73,7 +59,7 @@ impl Context {
         self.system_message
             .iter()
             .map(|system_message| SystemMessage::new(system_message.clone()).into())
-            .chain(self.conversation.iter().flat_map(|(request, response)| {
+            .chain(self.conversation.iter().flat_map(|(request, response, _)| {
                 [
                     UserMessage::new(request.clone()).into(),
                     AssistantMessage::new(response.clone()).into(),
@@ -84,36 +70,28 @@ impl Context {
     }
 
     /// Extend the context with a new pair of request and response.
-    pub fn push(&mut self, request: String, response: String) {
-        self.conversation.push((request, response));
+    pub fn push(&mut self, request: String, response: String, tokens: usize) {
+        self.conversation.push((request, response, tokens));
         self.keep_recent();
     }
 
     /// Discard old records to keep the context within the limits.
     fn keep_recent(&mut self) {
-        let Some(ref tokenizer) = self.tokenizer else {
+        if self.min_history_tokens.is_none() && self.max_history_tokens.is_none() {
             return;
-        };
+        }
 
-        // At least one of the numbers is limited if tokenizer is set.
-        debug_assert!(self.min_history_tokens.is_some() || self.max_history_tokens.is_some());
         let min_tokens = self.min_history_tokens.unwrap_or(usize::MAX);
         let max_tokens = self.max_history_tokens.unwrap_or(usize::MAX);
-
-        let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
-
-        let system_tokens = self
-            .system_message
-            .as_ref()
-            .map(|m| num_tokens(m))
-            .unwrap_or_default();
 
         let keep = self
             .conversation
             .iter()
             .rev()
-            .map(|transaction| num_tokens(&transaction.0) + num_tokens(&transaction.1))
-            .accumulate((0, system_tokens), |(_, acc), x| (acc, acc + x))
+            .map(|transaction| transaction.2)
+            .accumulate((0, self.system_message_tokens), |(_, acc), x| {
+                (acc, acc + x)
+            })
             .map_while(|(prev, current)| (prev < min_tokens).then_some(current))
             .take_while(|current| *current <= max_tokens)
             .count();
@@ -142,7 +120,7 @@ mod tests {
     #[test]
     fn non_empty() {
         let mut context = Context::default();
-        context.push(String::from("req1"), String::from("resp1"));
+        context.push(String::from("req1"), String::from("resp1"), 2);
 
         assert_eq!(
             context
@@ -158,7 +136,7 @@ mod tests {
 
     #[test]
     fn empty_with_system_message() {
-        let context = Context::new(Some(String::from("system")));
+        let context = Context::new(Some(String::from("system")), 1, None, None);
 
         assert_eq!(
             context
@@ -173,8 +151,8 @@ mod tests {
 
     #[test]
     fn non_empty_with_system_message() {
-        let mut context = Context::new(Some(String::from("system")));
-        context.push(String::from("req1"), String::from("resp1"));
+        let mut context = Context::new(Some(String::from("system")), 1, None, None);
+        context.push(String::from("req1"), String::from("resp1"), 2);
 
         assert_eq!(
             context
@@ -191,119 +169,91 @@ mod tests {
 
     #[test]
     fn min_history_tokens() {
-        let tokenizer = Arc::new(tiktoken_rs::o200k_base().unwrap());
-        let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
         let system = "to to to to to".to_string();
         let request = "do do do do do".to_string();
         let response = "be be be be be".to_string();
-        assert_eq!(num_tokens(&system), 5);
-        assert_eq!(num_tokens(&request), 5);
-        assert_eq!(num_tokens(&response), 5);
 
-        let mut context = Context::new_with_rolling_window(
-            Some(system.to_string()),
-            tokenizer.clone(),
-            Some(20),
-            None,
-        );
+        let mut context = Context::new(Some(system.to_string()), 5, Some(20), None);
         assert!(context.conversation.is_empty());
 
         // 15 tokens
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 1);
 
         // 25 tokens
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
 
         // 25 tokens again: one transaction was discarded
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
     }
 
     #[test]
     fn min_history_tokens_exact() {
-        let tokenizer = Arc::new(tiktoken_rs::o200k_base().unwrap());
-        let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
         let request = "do do do do do".to_string();
         let response = "be be be be be".to_string();
-        assert_eq!(num_tokens(&request), 5);
-        assert_eq!(num_tokens(&response), 5);
 
-        let mut context = Context::new_with_rolling_window(None, tokenizer.clone(), Some(20), None);
+        let mut context = Context::new(None, 0, Some(20), None);
         assert!(context.conversation.is_empty());
 
         // 10 tokens
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 1);
 
         // 20 tokens
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
 
         // 20 tokens again: one transaction was discarded
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
     }
 
     #[test]
     fn max_history_tokens() {
-        let tokenizer = Arc::new(tiktoken_rs::o200k_base().unwrap());
-        let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
         let system = "to to to to to".to_string();
         let request = "do do do do do".to_string();
         let response = "be be be be be".to_string();
-        assert_eq!(num_tokens(&system), 5);
-        assert_eq!(num_tokens(&request), 5);
-        assert_eq!(num_tokens(&response), 5);
 
-        let mut context = Context::new_with_rolling_window(
-            Some(system.to_string()),
-            tokenizer.clone(),
-            None,
-            Some(30),
-        );
+        let mut context = Context::new(Some(system.to_string()), 5, None, Some(30));
         assert!(context.conversation.is_empty());
 
         // 15 tokens
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 1);
 
         // 25 tokens
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
 
         // 25 tokens again: one transaction was discarded
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
     }
 
     #[test]
     fn max_history_tokens_exact() {
-        let tokenizer = Arc::new(tiktoken_rs::o200k_base().unwrap());
-        let num_tokens = |m| tokenizer.encode_with_special_tokens(m).len();
         let request = "do do do do do".to_string();
         let response = "be be be be be".to_string();
-        assert_eq!(num_tokens(&request), 5);
-        assert_eq!(num_tokens(&response), 5);
 
-        let mut context = Context::new_with_rolling_window(None, tokenizer.clone(), None, Some(30));
+        let mut context = Context::new(None, 0, None, Some(30));
         assert!(context.conversation.is_empty());
 
         // 10 tokens
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 1);
 
         // 20 tokens
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
 
         // 30 tokens
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 3);
 
         // 30 tokens again: one transaction was discarded
-        context.push(request.clone(), response.clone());
+        context.push(request.clone(), response.clone(), 10);
         assert_eq!(context.conversation.len(), 3);
     }
 }

@@ -189,6 +189,7 @@ pub struct ChatClient {
     context: Context,
     sanitize_links: bool,
     sanitize_re: regex::Regex,
+    tokenizer: Arc<tiktoken_rs::CoreBPE>,
 }
 
 impl ChatClient {
@@ -240,16 +241,17 @@ impl ChatClient {
             timeout: http_timeout,
         })?;
 
-        let context = if min_history_tokens.is_some() || max_history_tokens.is_some() {
-            Context::new_with_rolling_window(
-                system_message,
-                tokenizer,
-                min_history_tokens,
-                max_history_tokens,
-            )
-        } else {
-            Context::new(system_message)
-        };
+        let system_tokens = system_message
+            .as_ref()
+            .map(|m| tokenizer.encode_with_special_tokens(m).len())
+            .unwrap_or_default();
+
+        let context = Context::new(
+            system_message,
+            system_tokens,
+            min_history_tokens,
+            max_history_tokens,
+        );
 
         // Note closing ")" — we rely on the fact that openai utm parameter is appended last.
         let sanitize_re = Regex::new(r"(?:\?|\&)utm_source=openai\)").expect("to be valid regex");
@@ -264,6 +266,7 @@ impl ChatClient {
             context,
             sanitize_links,
             sanitize_re,
+            tokenizer,
         })
     }
 
@@ -328,7 +331,10 @@ impl ChatClient {
     }
 
     pub(crate) fn extend_context(&mut self, request: String, response: String) {
-        self.context.push(request, response);
+        let num_tokens = |m| self.tokenizer.encode_with_special_tokens(m).len();
+        let tokens = num_tokens(&request) + num_tokens(&response);
+
+        self.context.push(request, response, tokens);
     }
 
     /// Construct a request body.
