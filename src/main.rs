@@ -108,7 +108,7 @@ impl Chat {
             match attach_file(path) {
                 Ok(attachment) => {
                     self.pending_attachments.push(attachment);
-                    let message = format!("Attached file: {path}");
+                    let message = format!("File attached: {path}");
                     println!("{}", message.blue());
                 }
                 Err(e) => {

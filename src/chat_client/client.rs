@@ -35,6 +35,7 @@ use crate::chat_client::{
 use eventsource_stream::{Event, EventStreamError};
 use futures::stream::Stream;
 use regex::Regex;
+use serde_json::{json, Value};
 use std::time::Duration;
 
 /// OpenRouter reasoning settings.
@@ -58,6 +59,8 @@ pub enum ApiOptions {
     OpenRouter {
         /// Reasoning settings.
         reasoning: Option<ReasoningSettings>,
+        /// PDF engine. Typically one of `native`, `mistral-ocr`, `pdf-text`.
+        pdf_engine: Option<String>,
     },
 }
 
@@ -72,10 +75,28 @@ impl ApiOptions {
     /// Check if the API type is OpenRouter.
     pub fn as_openrouter_reasoning_settings(&self) -> Option<OpenRouterReasoning> {
         match self {
-            ApiOptions::OpenRouter { reasoning } => reasoning.as_ref().map(|r| match r {
+            ApiOptions::OpenRouter {
+                reasoning,
+                pdf_engine: _,
+            } => reasoning.as_ref().map(|r| match r {
                 ReasoningSettings::Effort(e) => OpenRouterReasoning::from_effort(e.clone()),
                 ReasoningSettings::Budget(b) => OpenRouterReasoning::from_budget(*b),
             }),
+            _ => None,
+        }
+    }
+    /// PDF engine plugin configuration if OpenRouter.
+    pub fn as_openrouter_plugins(&self) -> Option<Vec<Value>> {
+        match self {
+            ApiOptions::OpenRouter {
+                reasoning: _,
+                pdf_engine: Some(engine),
+            } => Some(vec![json!({
+                "id": "file-parser",
+                "pdf": {
+                    "engine": engine,
+                }
+            })]),
             _ => None,
         }
     }
@@ -371,6 +392,7 @@ impl ChatClient {
                 include_obfuscation: None,
                 include_usage: Some(true),
             }),
+            plugins: api_options.as_openrouter_plugins(),
             ..Default::default()
         }
     }
