@@ -26,11 +26,15 @@ mod app_config;
 use app_config::{Args, Configuration};
 
 use anyhow::{anyhow, Context as _};
+use base64::prelude::{Engine, BASE64_STANDARD};
 use colored::Colorize as _;
 use futures::stream::StreamExt;
-use jutella::{ChatClient, ChatClientConfig, Content, Delta, TokenUsage};
+use jutella::{
+    ChatClient, ChatClientConfig, Content, ContentPart, Delta, FilePart, ImagePart, TokenUsage,
+};
 use std::{
     io::{self, Read as _, Write as _},
+    path::Path,
     process::{Command, Stdio},
 };
 
@@ -75,6 +79,7 @@ async fn main() -> anyhow::Result<()> {
         xclip,
         show_token_usage,
         stream,
+        pending_attachments: Vec::new(),
     };
 
     chat.run().await
@@ -94,13 +99,49 @@ struct Chat {
     xclip: bool,
     show_token_usage: bool,
     stream: bool,
+    pending_attachments: Vec<ContentPart>,
 }
 
 impl Chat {
     async fn handle_line(&mut self, line: String) -> anyhow::Result<()> {
+        if let Some(path) = line.strip_prefix("#file:") {
+            match attach_file(path) {
+                Ok(attachment) => {
+                    self.pending_attachments.push(attachment);
+                    let message = format!("Attached file: {path}");
+                    println!("{}", message.blue());
+                }
+                Err(e) => {
+                    print_error(e);
+                }
+            }
+
+            print_prompt()?;
+            return Ok(());
+        }
+
+        let content = {
+            if self.pending_attachments.is_empty() {
+                Content::Text(line)
+            } else {
+                let mut parts = std::mem::take(&mut self.pending_attachments);
+                parts.push(ContentPart::Text(line));
+
+                Content::ContentParts(parts)
+            }
+        };
+
+        if self.stream {
+            self.handle_completion_streaming(content).await
+        } else {
+            self.handle_completion(content).await
+        }
+    }
+
+    async fn handle_completion(&mut self, request: Content) -> anyhow::Result<()> {
         if let Ok(completion) = self
             .client
-            .request_completion(Content::Text(line))
+            .request_completion(request)
             .await
             .inspect_err(|e| print_error(e))
         {
@@ -128,10 +169,10 @@ impl Chat {
         Ok(())
     }
 
-    async fn handle_line_streaming(&mut self, line: String) -> anyhow::Result<()> {
+    async fn handle_completion_streaming(&mut self, request: Content) -> anyhow::Result<()> {
         if let Ok(mut stream) = self
             .client
-            .stream_completion(Content::Text(line))
+            .stream_completion(request)
             .await
             .inspect_err(|e| print_error(e))
         {
@@ -206,11 +247,7 @@ impl Chat {
         print_prompt()?;
 
         for line in io::stdin().lines() {
-            if self.stream {
-                self.handle_line_streaming(line?).await?;
-            } else {
-                self.handle_line(line?).await?;
-            }
+            self.handle_line(line?).await?;
         }
 
         println!();
@@ -291,5 +328,40 @@ fn count_trailing_newlines(mut string: String) -> u8 {
         }
     } else {
         0
+    }
+}
+
+fn attach_file(path: &str) -> anyhow::Result<ContentPart> {
+    let (mime_type, is_pdf) = if path.ends_with(".pdf") {
+        ("application/pdf", true)
+    } else if path.ends_with(".jpg") || path.ends_with(".jpeg") {
+        ("image/jpeg", false)
+    } else if path.ends_with(".png") {
+        ("image/png", false)
+    } else if path.ends_with(".gif") {
+        ("image/gif", false)
+    } else if path.ends_with(".webp") {
+        ("image/webp", false)
+    } else {
+        return Err(anyhow!("unsupported file extension"));
+    };
+
+    let filename = Path::new(path)
+        .file_name()
+        .and_then(|filename| filename.to_str().map(ToOwned::to_owned));
+    let binary = std::fs::read(path).context("failed to read file")?;
+    let base64_string = BASE64_STANDARD.encode(binary);
+    let encoded_data = format!("data:{mime_type};base64,{base64_string}");
+
+    if is_pdf {
+        Ok(ContentPart::File(FilePart {
+            file_data: encoded_data,
+            filename,
+        }))
+    } else {
+        Ok(ContentPart::Image(ImagePart {
+            url: encoded_data,
+            detail: None,
+        }))
     }
 }

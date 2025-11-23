@@ -8,6 +8,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { version = "1.0.100", optional = true }
+base64 = { version = "0.22.1", optional = true }
 bytes = "1.10.1"
 clap = { version = "4.5.51", features = ["derive", "wrap_help"], optional = true }
 colored = { version = "3.0.0", optional = true }
@@ -27,4 +28,4 @@ url = "2.5.7"
 
 [features]
 default = ["bin"]
-bin = ["dep:anyhow", "dep:clap", "dep:colored", "dep:dirs", "dep:toml"]
+bin = ["dep:anyhow", "dep:base64", "dep:clap", "dep:colored", "dep:dirs", "dep:toml"]
