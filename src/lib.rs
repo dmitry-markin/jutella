@@ -28,6 +28,9 @@ mod chat_client;
 pub use chat_client::{
     client::{ApiOptions, ChatClient, ChatClientConfig, Completion, ReasoningSettings, TokenUsage},
     error::Error,
-    openai_api::client::Auth,
+    openai_api::{
+        client::Auth,
+        message::{Content, ContentPart, FilePart, ImagePart},
+    },
     stream::{CompletionStream, Delta},
 };

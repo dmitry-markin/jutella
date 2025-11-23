@@ -28,7 +28,7 @@ use app_config::{Args, Configuration};
 use anyhow::{anyhow, Context as _};
 use colored::Colorize as _;
 use futures::stream::StreamExt;
-use jutella::{ChatClient, ChatClientConfig, Delta, TokenUsage};
+use jutella::{ChatClient, ChatClientConfig, Content, Delta, TokenUsage};
 use std::{
     io::{self, Read as _, Write as _},
     process::{Command, Stdio},
@@ -100,7 +100,7 @@ impl Chat {
     async fn handle_line(&mut self, line: String) -> anyhow::Result<()> {
         if let Ok(completion) = self
             .client
-            .request_completion(line)
+            .request_completion(Content::Text(line))
             .await
             .inspect_err(|e| print_error(e))
         {
@@ -131,7 +131,7 @@ impl Chat {
     async fn handle_line_streaming(&mut self, line: String) -> anyhow::Result<()> {
         if let Ok(mut stream) = self
             .client
-            .stream_completion(line)
+            .stream_completion(Content::Text(line))
             .await
             .inspect_err(|e| print_error(e))
         {

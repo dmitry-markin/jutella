@@ -271,11 +271,13 @@ impl ChatClient {
 
     /// Ask a new question, extending the chat context after a successful respone.
     pub async fn ask(&mut self, request: String) -> Result<String, Error> {
-        self.request_completion(request).await.map(|c| c.response)
+        self.request_completion(Content::Text(request))
+            .await
+            .map(|c| c.response)
     }
 
     /// Request completion, extending the chat context after a successful respone.
-    pub async fn request_completion(&mut self, request: String) -> Result<Completion, Error> {
+    pub async fn request_completion(&mut self, request: Content) -> Result<Completion, Error> {
         let mut completion = self
             .client
             .chat_completions(Self::body(
@@ -312,7 +314,7 @@ impl ChatClient {
     /// Stream completion, extending the chat context on success.
     pub async fn stream_completion<'a>(
         &'a mut self,
-        request: String,
+        request: Content,
     ) -> Result<
         CompletionStream<'a, impl Stream<Item = Result<Event, EventStreamError<reqwest::Error>>>>,
         Error,
@@ -330,7 +332,12 @@ impl ChatClient {
         Ok(CompletionStream::new(self, stream, request))
     }
 
-    pub(crate) fn extend_context(&mut self, request: String, response: String, usage: &TokenUsage) {
+    pub(crate) fn extend_context(
+        &mut self,
+        request: Content,
+        response: String,
+        usage: &TokenUsage,
+    ) {
         // TODO: log warning if context tokens > `tokens_in`.
         let request_tokens = usage.tokens_in.saturating_sub(self.context.tokens());
         // TODO: log warning if `reasoning_tokens` > `completion_tokens`.
@@ -338,11 +345,8 @@ impl ChatClient {
             .tokens_out
             .saturating_sub(usage.tokens_reasoning.unwrap_or_default());
 
-        self.context.push(
-            Content::Text(request),
-            response.clone(),
-            request_tokens + response_tokens,
-        );
+        self.context
+            .push(request, response.clone(), request_tokens + response_tokens);
     }
 
     /// Construct a request body.
@@ -353,15 +357,12 @@ impl ChatClient {
             verbosity,
         }: ModelConfig,
         context: &Context,
-        request: String,
+        request: Content,
         stream: bool,
     ) -> ChatCompletionsRequest {
         ChatCompletionsRequest {
             model,
-            messages: context
-                .with_request(Content::Text(request))
-                .map(Into::into)
-                .collect(),
+            messages: context.with_request(request).map(Into::into).collect(),
             reasoning_effort: api_options.as_openai_reasoning_effort(),
             reasoning: api_options.as_openrouter_reasoning_settings(),
             verbosity,

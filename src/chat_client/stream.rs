@@ -25,7 +25,7 @@
 use crate::chat_client::{
     client::{ChatClient, TokenUsage},
     error::Error,
-    openai_api::chat_completions::StreamingChunk,
+    openai_api::{chat_completions::StreamingChunk, message::Content},
 };
 use eventsource_stream::{Event, EventStreamError};
 use futures::{
@@ -75,11 +75,11 @@ pub struct CompletionStream<'a, S> {
     client: &'a mut ChatClient,
     stream: S,
     state: State,
-    request: String,
+    request: Content,
 }
 
 impl<'a, S> CompletionStream<'a, S> {
-    pub(crate) fn new(client: &'a mut ChatClient, stream: S, request: String) -> Self {
+    pub(crate) fn new(client: &'a mut ChatClient, stream: S, request: Content) -> Self {
         Self {
             client,
             stream,
