@@ -71,9 +71,17 @@ pub struct UserMessage {
 }
 
 impl UserMessage {
-    pub fn new(content: String) -> Self {
+    pub fn new(content: Content) -> Self {
         Self {
-            content: Content::Text(content),
+            content,
+            name: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_from_str(content: &str) -> Self {
+        Self {
+            content: Content::Text(content.to_string()),
             name: None,
         }
     }

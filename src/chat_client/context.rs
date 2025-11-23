@@ -23,7 +23,7 @@
 //! Chatbot context.
 
 use crate::chat_client::openai_api::message::{
-    AssistantMessage, Message, SystemMessage, UserMessage,
+    AssistantMessage, Content, Message, SystemMessage, UserMessage,
 };
 use iter_accumulate::IterAccumulate;
 
@@ -32,7 +32,7 @@ use iter_accumulate::IterAccumulate;
 pub struct Context {
     system_message: Option<String>,
     system_message_tokens: usize,
-    conversation: Vec<(String, String, usize)>,
+    conversation: Vec<(Content, String, usize)>,
     min_history_tokens: Option<usize>,
     max_history_tokens: Option<usize>,
 }
@@ -55,7 +55,7 @@ impl Context {
     }
 
     /// Context so far with a new request message.
-    pub fn with_request(&self, request: String) -> impl Iterator<Item = Message> + '_ {
+    pub fn with_request(&self, request: Content) -> impl Iterator<Item = Message> + '_ {
         self.system_message
             .iter()
             .map(|system_message| SystemMessage::new(system_message.clone()).into())
@@ -70,7 +70,7 @@ impl Context {
     }
 
     /// Extend the context with a new pair of request and response.
-    pub fn push(&mut self, request: String, response: String, tokens: usize) {
+    pub fn push(&mut self, request: Content, response: String, tokens: usize) {
         self.conversation.push((request, response, tokens));
         self.keep_recent();
     }
@@ -121,25 +121,29 @@ mod tests {
 
         assert_eq!(
             context
-                .with_request(String::from("req"))
+                .with_request(Content::Text(String::from("req")))
                 .collect::<Vec<_>>(),
-            vec![UserMessage::new(String::from("req")).into()],
+            vec![UserMessage::new_from_str("req").into()],
         );
     }
 
     #[test]
     fn non_empty() {
         let mut context = Context::default();
-        context.push(String::from("req1"), String::from("resp1"), 2);
+        context.push(
+            Content::Text(String::from("req1")),
+            String::from("resp1"),
+            2,
+        );
 
         assert_eq!(
             context
-                .with_request(String::from("req2"))
+                .with_request(Content::Text(String::from("req2")))
                 .collect::<Vec<_>>(),
             vec![
-                UserMessage::new(String::from("req1")).into(),
+                UserMessage::new_from_str("req1").into(),
                 AssistantMessage::new(String::from("resp1")).into(),
-                UserMessage::new(String::from("req2")).into(),
+                UserMessage::new_from_str("req2").into(),
             ],
         );
     }
@@ -150,11 +154,11 @@ mod tests {
 
         assert_eq!(
             context
-                .with_request(String::from("req"))
+                .with_request(Content::Text(String::from("req")))
                 .collect::<Vec<_>>(),
             vec![
                 SystemMessage::new(String::from("system")).into(),
-                UserMessage::new(String::from("req")).into(),
+                UserMessage::new_from_str("req").into(),
             ]
         );
     }
@@ -162,17 +166,21 @@ mod tests {
     #[test]
     fn non_empty_with_system_message() {
         let mut context = Context::new(Some(String::from("system")), 1, None, None);
-        context.push(String::from("req1"), String::from("resp1"), 2);
+        context.push(
+            Content::Text(String::from("req1")),
+            String::from("resp1"),
+            2,
+        );
 
         assert_eq!(
             context
-                .with_request(String::from("req2"))
+                .with_request(Content::Text(String::from("req2")))
                 .collect::<Vec<_>>(),
             vec![
                 SystemMessage::new(String::from("system")).into(),
-                UserMessage::new(String::from("req1")).into(),
+                UserMessage::new_from_str("req1").into(),
                 AssistantMessage::new(String::from("resp1")).into(),
-                UserMessage::new(String::from("req2")).into(),
+                UserMessage::new_from_str("req2").into(),
             ]
         );
     }
@@ -187,15 +195,15 @@ mod tests {
         assert!(context.conversation.is_empty());
 
         // 15 tokens
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 1);
 
         // 25 tokens
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
 
         // 25 tokens again: one transaction was discarded
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
     }
 
@@ -208,15 +216,15 @@ mod tests {
         assert!(context.conversation.is_empty());
 
         // 10 tokens
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 1);
 
         // 20 tokens
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
 
         // 20 tokens again: one transaction was discarded
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
     }
 
@@ -230,15 +238,15 @@ mod tests {
         assert!(context.conversation.is_empty());
 
         // 15 tokens
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 1);
 
         // 25 tokens
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
 
         // 25 tokens again: one transaction was discarded
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
     }
 
@@ -251,19 +259,19 @@ mod tests {
         assert!(context.conversation.is_empty());
 
         // 10 tokens
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 1);
 
         // 20 tokens
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 2);
 
         // 30 tokens
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 3);
 
         // 30 tokens again: one transaction was discarded
-        context.push(request.clone(), response.clone(), 10);
+        context.push(Content::Text(request.clone()), response.clone(), 10);
         assert_eq!(context.conversation.len(), 3);
     }
 }

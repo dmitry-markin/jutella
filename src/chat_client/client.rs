@@ -28,7 +28,7 @@ use crate::chat_client::{
     openai_api::{
         chat_completions::{ChatCompletionsRequest, OpenRouterReasoning, StreamOptions, Usage},
         client::{Auth, OpenAiClient, OpenAiClientConfig},
-        message::AssistantMessage,
+        message::{AssistantMessage, Content},
     },
     stream::CompletionStream,
 };
@@ -338,8 +338,11 @@ impl ChatClient {
             .tokens_out
             .saturating_sub(usage.tokens_reasoning.unwrap_or_default());
 
-        self.context
-            .push(request, response.clone(), request_tokens + response_tokens);
+        self.context.push(
+            Content::Text(request),
+            response.clone(),
+            request_tokens + response_tokens,
+        );
     }
 
     /// Construct a request body.
@@ -355,7 +358,10 @@ impl ChatClient {
     ) -> ChatCompletionsRequest {
         ChatCompletionsRequest {
             model,
-            messages: context.with_request(request).map(Into::into).collect(),
+            messages: context
+                .with_request(Content::Text(request))
+                .map(Into::into)
+                .collect(),
             reasoning_effort: api_options.as_openai_reasoning_effort(),
             reasoning: api_options.as_openrouter_reasoning_settings(),
             verbosity,
