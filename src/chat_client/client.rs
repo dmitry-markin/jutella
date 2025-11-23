@@ -26,7 +26,7 @@ use crate::chat_client::{
     context::Context,
     error::Error,
     openai_api::{
-        chat_completions::{ChatCompletionsBody, OpenRouterReasoning, StreamOptions, Usage},
+        chat_completions::{ChatCompletionsRequest, OpenRouterReasoning, StreamOptions, Usage},
         client::{Auth, OpenAiClient, OpenAiClientConfig},
         message::AssistantMessage,
     },
@@ -352,8 +352,8 @@ impl ChatClient {
         context: &Context,
         request: String,
         stream: bool,
-    ) -> ChatCompletionsBody {
-        ChatCompletionsBody {
+    ) -> ChatCompletionsRequest {
+        ChatCompletionsRequest {
             model,
             messages: context.with_request(request).map(Into::into).collect(),
             reasoning_effort: api_options.as_openai_reasoning_effort(),
