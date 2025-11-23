@@ -254,7 +254,7 @@ pub struct ChatCompletionsRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<OpenRouterReasoning>,
 
-    /// OpenRouter plugins. Used to specify PDF engine.
+    /// OpenRouter plugins. Used to enable PDF engine.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plugins: Option<Vec<Value>>,
 }
