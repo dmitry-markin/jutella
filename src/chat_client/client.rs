@@ -98,14 +98,6 @@ pub struct ChatClientConfig {
     pub model: String,
     /// System message to initialize the model.
     pub system_message: Option<String>,
-    /// Optional system message token count.
-    ///
-    /// If passed, tokenizer won't be instantiated to measure system
-    /// message. This reduces RAM usage by approx. 50MiB on startup.
-    ///
-    /// Note that tokenizer is only used on startup in any case —
-    /// API provided token info is used to measure user and model messages during operation.
-    pub system_tokens_measurement: Option<usize>,
     /// Min history tokens to keep in the conversation context.
     ///
     /// The context will be truncated to keep at least `min_history_tokens`, but
@@ -137,7 +129,6 @@ impl ChatClientConfig {
             http_timeout: Duration::from_secs(300),
             model: String::from("gpt-4o-mini"),
             system_message: None,
-            system_tokens_measurement: None,
             min_history_tokens: None,
             max_history_tokens: None,
             verbosity: None,
@@ -211,6 +202,28 @@ impl ChatClient {
         config: ChatClientConfig,
         client: reqwest::Client,
     ) -> Result<Self, Error> {
+        let system_tokens = match config.system_message {
+            None => 0,
+            Some(ref system_message) => {
+                let tokenizer =
+                    tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?;
+                tokenizer.encode_with_special_tokens(system_message).len()
+            }
+        };
+
+        Self::new_with_client_and_system_tokens(config, client, system_tokens)
+    }
+
+    /// Create new [`ChatClient`] accessing OpenAI chat API sharing existing [`reqwest::Client`]
+    /// and pass the system token count.
+    ///
+    /// When this constructor iis used, tokenizer is not instantiated, saving ~50 MB of RAM on
+    /// startup.
+    pub fn new_with_client_and_system_tokens(
+        config: ChatClientConfig,
+        client: reqwest::Client,
+        system_tokens: usize,
+    ) -> Result<Self, Error> {
         let ChatClientConfig {
             auth,
             api_url,
@@ -219,7 +232,6 @@ impl ChatClient {
             http_timeout,
             model,
             system_message,
-            system_tokens_measurement,
             min_history_tokens,
             max_history_tokens,
             verbosity,
@@ -233,16 +245,6 @@ impl ChatClient {
             api_version,
             timeout: http_timeout,
         })?;
-
-        let system_tokens = match (&system_message, system_tokens_measurement) {
-            (Some(_), Some(system_tokens)) => system_tokens,
-            (Some(ref system_message), None) => {
-                let tokenizer =
-                    tiktoken_rs::o200k_base().map_err(|e| Error::TokenizerInit(format!("{e}")))?;
-                tokenizer.encode_with_special_tokens(system_message).len()
-            }
-            _ => 0,
-        };
 
         let context = Context::new(
             system_message,
