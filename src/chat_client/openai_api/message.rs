@@ -22,7 +22,10 @@
 
 //! OpenAI API Message types.
 
-use serde::{Deserialize, Serialize};
+use serde::{
+    ser::{SerializeMap, SerializeSeq},
+    Deserialize, Serialize, Serializer,
+};
 use serde_json::value::Value;
 
 /// Conversation message.
@@ -61,16 +64,24 @@ impl SystemMessage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserMessage {
     /// The contents of the message.
-    pub content: String,
+    pub content: Content,
     /// An optional name for the participant. Provides the model information
     /// to differentiate between participants of the same role.
     pub name: Option<String>,
 }
 
 impl UserMessage {
-    pub fn new(content: String) -> Self {
+    pub fn new(content: Content) -> Self {
         Self {
             content,
+            name: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_from_str(content: &str) -> Self {
+        Self {
+            content: Content::Text(content.to_string()),
             name: None,
         }
     }
@@ -151,9 +162,9 @@ pub enum Role {
     Tool,
 }
 
-/// Generic message.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct GenericMessage {
+/// Single-part generic message. Used to parse model responses.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct ResponseGenericMessage {
     /// The role of the message author.
     role: Role,
     /// The contents of the message.
@@ -173,13 +184,30 @@ pub struct GenericMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_call_id: Option<String>,
 
-    // OpenRouter specific fileds.
+    // OpenRouter specific fields.
     /// Reasoning performaed by model.
     #[serde(skip_serializing_if = "Option::is_none")]
     reasoning: Option<String>,
 }
 
-impl From<Message> for GenericMessage {
+/// Multi-part generic message. Used to pass user messages.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct RequestGenericMessage {
+    /// The role of the message author.
+    role: Role,
+    /// The contents of the message.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<Content>,
+    /// An optional name for the participant. Provides the model information
+    /// to differentiate between participants of the same role.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    /// Tool call that this message is responding to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_call_id: Option<String>,
+}
+
+impl From<Message> for RequestGenericMessage {
     fn from(message: Message) -> Self {
         match message {
             Message::System(m) => m.into(),
@@ -190,57 +218,48 @@ impl From<Message> for GenericMessage {
     }
 }
 
-impl From<SystemMessage> for GenericMessage {
+impl From<SystemMessage> for RequestGenericMessage {
     fn from(SystemMessage { content, name }: SystemMessage) -> Self {
         Self {
             role: Role::System,
-            content: Some(content),
+            content: Some(Content::Text(content)),
             name,
-            refusal: None,
-            tool_calls: None,
             tool_call_id: None,
-            reasoning: None,
         }
     }
 }
 
-impl From<UserMessage> for GenericMessage {
+impl From<UserMessage> for RequestGenericMessage {
     fn from(UserMessage { content, name }: UserMessage) -> Self {
         Self {
             role: Role::User,
             content: Some(content),
             name,
-            refusal: None,
-            tool_calls: None,
             tool_call_id: None,
-            reasoning: None,
         }
     }
 }
 
-impl From<AssistantMessage> for GenericMessage {
+impl From<AssistantMessage> for RequestGenericMessage {
     fn from(
         AssistantMessage {
             content,
             name,
-            refusal,
-            tool_calls,
-            reasoning,
+            refusal: _,
+            tool_calls: _,
+            reasoning: _,
         }: AssistantMessage,
     ) -> Self {
         Self {
             role: Role::Assistant,
-            content,
+            content: content.map(Content::Text),
             name,
-            refusal,
-            tool_calls,
             tool_call_id: None,
-            reasoning,
         }
     }
 }
 
-impl From<ToolMessage> for GenericMessage {
+impl From<ToolMessage> for RequestGenericMessage {
     fn from(
         ToolMessage {
             content,
@@ -249,26 +268,91 @@ impl From<ToolMessage> for GenericMessage {
     ) -> Self {
         Self {
             role: Role::Tool,
-            content: Some(content),
+            content: Some(Content::Text(content)),
             name: None,
-            refusal: None,
-            tool_calls: None,
             tool_call_id: Some(tool_call_id),
-            reasoning: None,
         }
     }
 }
 
-impl TryFrom<GenericMessage> for Message {
-    type Error = Error;
+/// Image part in a multi-part user message.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+pub struct ImagePart {
+    /// Image URL or base64-encoded image data in the following format:
+    /// `data:{mime_type};base64,{base64_image}`.
+    pub url: String,
+    /// Image detail level. Typically one of `auto`, `low`, `high`.
+    pub detail: Option<String>,
+}
 
-    fn try_from(message: GenericMessage) -> Result<Self, Error> {
-        Ok(match message.role {
-            Role::System => Message::System(SystemMessage::try_from(message)?),
-            Role::User => Message::User(UserMessage::try_from(message)?),
-            Role::Assistant => Message::Assistant(AssistantMessage::try_from(message)?),
-            Role::Tool => Message::Tool(ToolMessage::try_from(message)?),
-        })
+/// File part in a multi-part user message.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+pub struct FilePart {
+    /// File URL (only supported by OpenRouter) or base64-encoded file data in the following
+    /// format: `data:application/pdf;base64,{base64_pdf}`.
+    pub file_data: String,
+    /// File name to pass to the model.
+    pub filename: Option<String>,
+}
+
+/// Content part of a multi-part user message.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ContentPart {
+    /// Text content part.
+    Text(String),
+    /// Image content part.
+    Image(ImagePart),
+    /// File content part.
+    File(FilePart),
+}
+
+impl Serialize for ContentPart {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            ContentPart::Text(s) => serializer.serialize_str(s),
+            ContentPart::Image(image) => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("type", "image_url")?;
+                map.serialize_entry("image_url", image)?;
+                map.end()
+            }
+            ContentPart::File(file) => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("type", "file")?;
+                map.serialize_entry("file", file)?;
+                map.end()
+            }
+        }
+    }
+}
+
+/// Content of the message. Either a string or array of content parts.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Content {
+    /// Text message content.
+    Text(String),
+    /// Multipart message content.
+    ContentParts(Vec<ContentPart>),
+}
+
+impl Serialize for Content {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Content::Text(s) => serializer.serialize_str(s),
+            Content::ContentParts(parts) => {
+                let mut seq = serializer.serialize_seq(Some(parts.len()))?;
+                for part in parts {
+                    seq.serialize_element(part)?;
+                }
+                seq.end()
+            }
+        }
     }
 }
 
@@ -283,40 +367,10 @@ pub enum Error {
     RoleMismatch(Role, Role),
 }
 
-impl TryFrom<GenericMessage> for SystemMessage {
+impl TryFrom<ResponseGenericMessage> for AssistantMessage {
     type Error = Error;
 
-    fn try_from(m: GenericMessage) -> Result<Self, Error> {
-        if m.role == Role::System {
-            Ok(Self {
-                content: m.content.ok_or(Error::MissingField("content"))?,
-                name: m.name,
-            })
-        } else {
-            Err(Error::RoleMismatch(Role::System, m.role))
-        }
-    }
-}
-
-impl TryFrom<GenericMessage> for UserMessage {
-    type Error = Error;
-
-    fn try_from(m: GenericMessage) -> Result<Self, Error> {
-        if m.role == Role::User {
-            Ok(Self {
-                content: m.content.ok_or(Error::MissingField("content"))?,
-                name: m.name,
-            })
-        } else {
-            Err(Error::RoleMismatch(Role::User, m.role))
-        }
-    }
-}
-
-impl TryFrom<GenericMessage> for AssistantMessage {
-    type Error = Error;
-
-    fn try_from(m: GenericMessage) -> Result<Self, Error> {
+    fn try_from(m: ResponseGenericMessage) -> Result<Self, Error> {
         if m.role == Role::Assistant {
             Ok(Self {
                 content: m.content,
@@ -327,21 +381,6 @@ impl TryFrom<GenericMessage> for AssistantMessage {
             })
         } else {
             Err(Error::RoleMismatch(Role::Assistant, m.role))
-        }
-    }
-}
-
-impl TryFrom<GenericMessage> for ToolMessage {
-    type Error = Error;
-
-    fn try_from(m: GenericMessage) -> Result<Self, Error> {
-        if m.role == Role::Tool {
-            Ok(Self {
-                content: m.content.ok_or(Error::MissingField("content"))?,
-                tool_call_id: m.tool_call_id.ok_or(Error::MissingField("tool_call_id"))?,
-            })
-        } else {
-            Err(Error::RoleMismatch(Role::Tool, m.role))
         }
     }
 }

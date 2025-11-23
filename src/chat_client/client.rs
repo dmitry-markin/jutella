@@ -26,15 +26,16 @@ use crate::chat_client::{
     context::Context,
     error::Error,
     openai_api::{
-        chat_completions::{ChatCompletionsBody, OpenRouterReasoning, StreamOptions, Usage},
+        chat_completions::{ChatCompletionsRequest, OpenRouterReasoning, StreamOptions, Usage},
         client::{Auth, OpenAiClient, OpenAiClientConfig},
-        message::AssistantMessage,
+        message::{AssistantMessage, Content},
     },
     stream::CompletionStream,
 };
 use eventsource_stream::{Event, EventStreamError};
 use futures::stream::Stream;
 use regex::Regex;
+use serde_json::{json, Value};
 use std::time::Duration;
 
 /// OpenRouter reasoning settings.
@@ -58,6 +59,8 @@ pub enum ApiOptions {
     OpenRouter {
         /// Reasoning settings.
         reasoning: Option<ReasoningSettings>,
+        /// PDF engine. Typically one of `native`, `mistral-ocr`, `pdf-text`.
+        pdf_engine: Option<String>,
     },
 }
 
@@ -72,10 +75,28 @@ impl ApiOptions {
     /// Check if the API type is OpenRouter.
     pub fn as_openrouter_reasoning_settings(&self) -> Option<OpenRouterReasoning> {
         match self {
-            ApiOptions::OpenRouter { reasoning } => reasoning.as_ref().map(|r| match r {
+            ApiOptions::OpenRouter {
+                reasoning,
+                pdf_engine: _,
+            } => reasoning.as_ref().map(|r| match r {
                 ReasoningSettings::Effort(e) => OpenRouterReasoning::from_effort(e.clone()),
                 ReasoningSettings::Budget(b) => OpenRouterReasoning::from_budget(*b),
             }),
+            _ => None,
+        }
+    }
+    /// PDF engine plugin configuration if OpenRouter.
+    pub fn as_openrouter_plugins(&self) -> Option<Vec<Value>> {
+        match self {
+            ApiOptions::OpenRouter {
+                reasoning: _,
+                pdf_engine: Some(engine),
+            } => Some(vec![json!({
+                "id": "file-parser",
+                "pdf": {
+                    "engine": engine,
+                }
+            })]),
             _ => None,
         }
     }
@@ -271,11 +292,13 @@ impl ChatClient {
 
     /// Ask a new question, extending the chat context after a successful respone.
     pub async fn ask(&mut self, request: String) -> Result<String, Error> {
-        self.request_completion(request).await.map(|c| c.response)
+        self.request_completion(Content::Text(request))
+            .await
+            .map(|c| c.response)
     }
 
     /// Request completion, extending the chat context after a successful respone.
-    pub async fn request_completion(&mut self, request: String) -> Result<Completion, Error> {
+    pub async fn request_completion(&mut self, request: Content) -> Result<Completion, Error> {
         let mut completion = self
             .client
             .chat_completions(Self::body(
@@ -312,7 +335,7 @@ impl ChatClient {
     /// Stream completion, extending the chat context on success.
     pub async fn stream_completion<'a>(
         &'a mut self,
-        request: String,
+        request: Content,
     ) -> Result<
         CompletionStream<'a, impl Stream<Item = Result<Event, EventStreamError<reqwest::Error>>>>,
         Error,
@@ -330,7 +353,12 @@ impl ChatClient {
         Ok(CompletionStream::new(self, stream, request))
     }
 
-    pub(crate) fn extend_context(&mut self, request: String, response: String, usage: &TokenUsage) {
+    pub(crate) fn extend_context(
+        &mut self,
+        request: Content,
+        response: String,
+        usage: &TokenUsage,
+    ) {
         // TODO: log warning if context tokens > `tokens_in`.
         let request_tokens = usage.tokens_in.saturating_sub(self.context.tokens());
         // TODO: log warning if `reasoning_tokens` > `completion_tokens`.
@@ -350,10 +378,10 @@ impl ChatClient {
             verbosity,
         }: ModelConfig,
         context: &Context,
-        request: String,
+        request: Content,
         stream: bool,
-    ) -> ChatCompletionsBody {
-        ChatCompletionsBody {
+    ) -> ChatCompletionsRequest {
+        ChatCompletionsRequest {
             model,
             messages: context.with_request(request).map(Into::into).collect(),
             reasoning_effort: api_options.as_openai_reasoning_effort(),
@@ -364,6 +392,7 @@ impl ChatClient {
                 include_obfuscation: None,
                 include_usage: Some(true),
             }),
+            plugins: api_options.as_openrouter_plugins(),
             ..Default::default()
         }
     }

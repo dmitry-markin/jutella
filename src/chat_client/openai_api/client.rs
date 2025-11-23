@@ -22,7 +22,7 @@
 
 //! OpenAI REST API client.
 
-use crate::chat_client::openai_api::chat_completions::{ChatCompletions, ChatCompletionsBody};
+use crate::chat_client::openai_api::chat_completions::{ChatCompletions, ChatCompletionsRequest};
 use eventsource_stream::{EventStream, Eventsource};
 use futures::stream::Stream;
 use reqwest::{
@@ -111,7 +111,7 @@ impl OpenAiClient {
     /// Request chat completion message.
     pub async fn chat_completions(
         &mut self,
-        body: ChatCompletionsBody,
+        body: ChatCompletionsRequest,
     ) -> Result<ChatCompletions, Error> {
         let response = self.build_request(body).send().await?;
 
@@ -139,7 +139,7 @@ impl OpenAiClient {
     /// Request chat completion stream.
     pub async fn chat_completions_stream(
         &mut self,
-        body: ChatCompletionsBody,
+        body: ChatCompletionsRequest,
     ) -> Result<EventStream<impl Stream<Item = Result<bytes::Bytes, reqwest::Error>>>, Error> {
         Ok(self
             .build_request(body)
@@ -150,7 +150,7 @@ impl OpenAiClient {
     }
 
     /// Build request.
-    fn build_request(&mut self, body: ChatCompletionsBody) -> RequestBuilder {
+    fn build_request(&mut self, body: ChatCompletionsRequest) -> RequestBuilder {
         RequestBuilder::from_parts(
             self.client.clone(),
             Request::new(Method::POST, self.endpoint.clone()),
