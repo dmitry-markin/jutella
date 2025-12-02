@@ -61,24 +61,23 @@ pub enum ApiOptions {
         reasoning: Option<ReasoningSettings>,
         /// PDF engine. Typically one of `native`, `mistral-ocr`, `pdf-text`.
         pdf_engine: Option<String>,
+        /// Enable image modality.
+        image_generation: bool,
     },
 }
 
 impl ApiOptions {
     /// Check if the API type is OpenAI.
-    pub fn as_openai_reasoning_effort(&self) -> Option<String> {
+    fn as_openai_reasoning_effort(&self) -> Option<String> {
         match self {
             ApiOptions::OpenAi { reasoning_effort } => reasoning_effort.clone(),
             _ => None,
         }
     }
     /// Check if the API type is OpenRouter.
-    pub fn as_openrouter_reasoning_settings(&self) -> Option<OpenRouterReasoning> {
+    fn as_openrouter_reasoning_settings(&self) -> Option<OpenRouterReasoning> {
         match self {
-            ApiOptions::OpenRouter {
-                reasoning,
-                pdf_engine: _,
-            } => reasoning.as_ref().map(|r| match r {
+            ApiOptions::OpenRouter { reasoning, .. } => reasoning.as_ref().map(|r| match r {
                 ReasoningSettings::Effort(e) => OpenRouterReasoning::from_effort(e.clone()),
                 ReasoningSettings::Budget(b) => OpenRouterReasoning::from_budget(*b),
             }),
@@ -86,17 +85,26 @@ impl ApiOptions {
         }
     }
     /// PDF engine plugin configuration if OpenRouter.
-    pub fn as_openrouter_plugins(&self) -> Option<Vec<Value>> {
+    fn as_openrouter_plugins(&self) -> Option<Vec<Value>> {
         match self {
             ApiOptions::OpenRouter {
-                reasoning: _,
                 pdf_engine: Some(engine),
+                ..
             } => Some(vec![json!({
                 "id": "file-parser",
                 "pdf": {
                     "engine": engine,
                 }
             })]),
+            _ => None,
+        }
+    }
+    /// Enable image modality if OpenRouter.
+    fn as_openrouter_modalities(&self) -> Option<Value> {
+        match self {
+            ApiOptions::OpenRouter {
+                image_generation, ..
+            } => image_generation.then_some(json!(["image", "text"])),
             _ => None,
         }
     }
@@ -406,6 +414,7 @@ impl ChatClient {
                 include_usage: Some(true),
             }),
             plugins: api_options.as_openrouter_plugins(),
+            modalities: api_options.as_openrouter_modalities(),
             ..Default::default()
         }
     }
