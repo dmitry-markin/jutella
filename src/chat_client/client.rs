@@ -28,7 +28,7 @@ use crate::chat_client::{
     openai_api::{
         chat_completions::{ChatCompletionsRequest, OpenRouterReasoning, StreamOptions, Usage},
         client::{Auth, OpenAiClient, OpenAiClientConfig},
-        message::{AssistantMessage, Content},
+        message::{Content, ContentPart, ResponseAssistantMessage},
     },
     stream::CompletionStream,
 };
@@ -36,7 +36,7 @@ use eventsource_stream::{Event, EventStreamError};
 use futures::stream::Stream;
 use regex::Regex;
 use serde_json::{json, Value};
-use std::time::Duration;
+use std::{iter, time::Duration};
 
 /// OpenRouter reasoning settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -188,7 +188,7 @@ impl From<Usage> for TokenUsage {
 #[derive(Debug)]
 pub struct Completion {
     /// Generated response.
-    pub response: String,
+    pub response: Content,
     /// Reasoning performed by the model.
     pub reasoning: Option<String>,
     /// Token usage.
@@ -294,7 +294,10 @@ impl ChatClient {
     pub async fn ask(&mut self, request: String) -> Result<String, Error> {
         self.request_completion(Content::Text(request))
             .await
-            .map(|c| c.response)
+            .and_then(|c| match c.response {
+                Content::Text(text) => Ok(text),
+                Content::ContentParts(_) => Err(Error::NonTextContent),
+            })
     }
 
     /// Request completion, extending the chat context after a successful respone.
@@ -310,7 +313,7 @@ impl ChatClient {
             .await?;
 
         let choice = completion.choices.pop().ok_or(Error::NoChoices)?;
-        let assistant_message = AssistantMessage::try_from(choice.message)?;
+        let assistant_message = ResponseAssistantMessage::try_from(choice.message)?;
         let response = assistant_message
             .content
             .map(|response| self.sanitize_links(response))
@@ -321,6 +324,16 @@ impl ChatClient {
             )?;
 
         // TODO: we likely need to report tokens used in case of errors as well.
+
+        let response = if let Some(images) = completion.images {
+            Content::ContentParts(
+                iter::once(ContentPart::Text(response))
+                    .chain(images.into_iter().map(ContentPart::Image))
+                    .collect(),
+            )
+        } else {
+            Content::Text(response)
+        };
 
         let token_usage = completion.usage.into();
         self.extend_context(request, response.clone(), &token_usage);
@@ -356,7 +369,7 @@ impl ChatClient {
     pub(crate) fn extend_context(
         &mut self,
         request: Content,
-        response: String,
+        response: Content,
         usage: &TokenUsage,
     ) {
         // TODO: log warning if context tokens > `tokens_in`.
@@ -367,7 +380,7 @@ impl ChatClient {
             .saturating_sub(usage.tokens_reasoning.unwrap_or_default());
 
         self.context
-            .push(request, response.clone(), request_tokens + response_tokens);
+            .push(request, response, request_tokens + response_tokens);
     }
 
     /// Construct a request body.
