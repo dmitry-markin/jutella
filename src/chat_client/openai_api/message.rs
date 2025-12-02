@@ -358,49 +358,15 @@ impl Serialize for Content {
     }
 }
 
-/// Generic content part that can hold either an image or a file. Used for `Deserialize`
-/// implementation only.
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
-pub struct GenericContentPart {
+/// Intermediate image content part. Used for `Deserialize` implementation only.
+#[derive(Debug, Clone, Eq, PartialEq, serde_query::Deserialize)]
+pub struct IntermediateImagePart {
     /// Type. Either `image_url` or `file`.
-    #[serde(rename = "type")]
+    #[query(".type")]
     ty: String,
     /// Imahge URL or base64 encoded data.
-    image_url: Option<String>,
-    /// File data as base64 encoded string.
-    file_data: Option<String>,
-    /// File name.
-    filename: Option<String>,
-}
-
-impl<'de> Deserialize<'de> for ContentPart {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let part = GenericContentPart::deserialize(deserializer)?;
-
-        match part.ty.as_ref() {
-            "image_url" => {
-                if let Some(url) = part.image_url {
-                    Ok(ContentPart::Image(ImagePart { url, detail: None }))
-                } else {
-                    Err(D::Error::custom("image without data"))
-                }
-            }
-            "file" => {
-                if let Some(file_data) = part.file_data {
-                    Ok(ContentPart::File(FilePart {
-                        file_data,
-                        filename: part.filename,
-                    }))
-                } else {
-                    Err(D::Error::custom("file without data"))
-                }
-            }
-            ty => Err(D::Error::custom(format!("unsupported type `{}`", ty))),
-        }
-    }
+    #[query(".image_url.url")]
+    url: String,
 }
 
 impl<'de> Deserialize<'de> for ImagePart {
@@ -408,16 +374,13 @@ impl<'de> Deserialize<'de> for ImagePart {
     where
         D: Deserializer<'de>,
     {
-        let part = GenericContentPart::deserialize(deserializer)?;
+        let part = IntermediateImagePart::deserialize(deserializer)?;
 
         match part.ty.as_ref() {
-            "image_url" => {
-                if let Some(url) = part.image_url {
-                    Ok(ImagePart { url, detail: None })
-                } else {
-                    Err(D::Error::custom("image without data"))
-                }
-            }
+            "image_url" => Ok(ImagePart {
+                url: part.url,
+                detail: None,
+            }),
             ty => Err(D::Error::custom(format!("unsupported type `{}`", ty))),
         }
     }
