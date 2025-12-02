@@ -333,7 +333,7 @@ impl ChatClient {
 
         // TODO: we likely need to report tokens used in case of errors as well.
 
-        let response = if let Some(images) = completion.images {
+        let response = if let Some(images) = assistant_message.images {
             Content::ContentParts(
                 iter::once(ContentPart::Text(response))
                     .chain(images.into_iter().map(ContentPart::Image))

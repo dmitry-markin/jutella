@@ -23,7 +23,7 @@
 //! OpenAI API Chat Completions request & response types.
 
 use crate::chat_client::openai_api::message::{
-    ImagePart, RequestGenericMessage, ResponseGenericMessage, Role,
+    RequestGenericMessage, ResponseGenericMessage, Role,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
@@ -376,9 +376,6 @@ pub struct ChatCompletions {
     // OpenRouter specific fields.
     /// Model provider.
     pub provider: Option<String>,
-
-    /// Genefrated images.
-    pub images: Option<Vec<ImagePart>>,
 }
 
 /// Completion choice
