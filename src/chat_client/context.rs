@@ -56,6 +56,14 @@ impl Context {
 
     /// Context so far with a new request message.
     pub fn with_request(&self, request: Content) -> impl Iterator<Item = Message> + '_ {
+        let request = match request {
+            Content::Text(text) => vec![UserMessage::new(Content::Text(text)).into()],
+            Content::ContentParts(parts) => parts
+                .into_iter()
+                .map(|p| UserMessage::new(Content::ContentParts(vec![p])).into())
+                .collect(),
+        };
+
         self.system_message
             .iter()
             .map(|system_message| SystemMessage::new(system_message.clone()).into())
@@ -66,7 +74,7 @@ impl Context {
                 ]
                 .into_iter()
             }))
-            .chain(std::iter::once(UserMessage::new(request).into()))
+            .chain(request.into_iter())
     }
 
     /// Extend the context with a new pair of request and response.
