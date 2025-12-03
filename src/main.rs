@@ -422,7 +422,7 @@ fn save_and_show_image(encoded_data: String) -> anyhow::Result<()> {
     let (_, path) = file.keep().context("failed to keep temporary file")?;
 
     let message = format!("File saved: {}", path.display());
-    println!("{}", message.blue());
+    println!("{}\n", message.blue());
 
     Ok(())
 }

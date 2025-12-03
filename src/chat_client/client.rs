@@ -335,7 +335,9 @@ impl ChatClient {
 
         let response = if let Some(images) = assistant_message.images {
             Content::ContentParts(
-                iter::once(ContentPart::Text(response))
+                (!response.is_empty())
+                    .then_some(ContentPart::Text(response))
+                    .into_iter()
                     .chain(images.into_iter().map(ContentPart::Image))
                     .collect(),
             )
