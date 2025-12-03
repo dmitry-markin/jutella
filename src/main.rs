@@ -124,10 +124,11 @@ impl Chat {
             if self.pending_attachments.is_empty() {
                 Content::Text(line)
             } else {
-                let mut parts = std::mem::take(&mut self.pending_attachments);
-                parts.push(ContentPart::Text(line));
-
-                Content::ContentParts(parts)
+                Content::ContentParts(
+                    std::iter::once(ContentPart::Text(line))
+                        .chain(std::mem::take(&mut self.pending_attachments).into_iter())
+                        .collect(),
+                )
             }
         };
 
