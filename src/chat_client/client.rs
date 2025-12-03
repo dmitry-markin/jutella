@@ -36,7 +36,7 @@ use eventsource_stream::{Event, EventStreamError};
 use futures::stream::Stream;
 use regex::Regex;
 use serde_json::{json, Value};
-use std::{iter, time::Duration};
+use std::time::Duration;
 
 /// OpenRouter reasoning settings.
 #[derive(Debug, Clone, PartialEq, Eq)]

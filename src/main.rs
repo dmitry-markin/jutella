@@ -161,18 +161,36 @@ impl Chat {
                     }
                 }
                 Content::ContentParts(parts) => {
+                    let mut needs_leading_newline = true;
+                    let mut needs_trailing_newline = false;
+
                     for part in parts {
                         match part {
-                            ContentPart::Text(text) => print_response(&text),
+                            ContentPart::Text(text) => {
+                                print_response(&text);
+                                needs_leading_newline = false;
+                                needs_trailing_newline = false;
+                            }
                             ContentPart::Image(ImagePart { url, detail: _ }) => {
+                                if needs_leading_newline {
+                                    println!();
+                                    needs_leading_newline = false;
+                                }
+
                                 if let Err(e) = save_and_show_image(url) {
                                     print_error(e)
                                 }
+
+                                needs_trailing_newline = true;
                             }
                             ContentPart::File(_) => {
                                 print_error("files in the response not supported, ignoring");
                             }
                         }
+                    }
+
+                    if needs_trailing_newline {
+                        println!();
                     }
                 }
             }
@@ -422,7 +440,7 @@ fn save_and_show_image(encoded_data: String) -> anyhow::Result<()> {
     let (_, path) = file.keep().context("failed to keep temporary file")?;
 
     let message = format!("File saved: {}", path.display());
-    println!("{}\n", message.blue());
+    println!("{}", message.bold().blue());
 
     Ok(())
 }
