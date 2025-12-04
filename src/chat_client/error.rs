@@ -59,4 +59,10 @@ pub enum Error {
     /// Content cant be represented as text.
     #[error("Content is not a text")]
     NonTextContent,
+    /// Internal error. This indicates a bug.
+    #[error("Internal error: {0}. This is a bug")]
+    InternalError(&'static str),
+    /// Body serialization error. This indicates a bug.
+    #[error("Body serialization error: {0}. This is a bug.")]
+    BodySerializationError(serde_json::Error),
 }

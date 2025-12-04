@@ -22,7 +22,7 @@
 
 //! OpenAI REST API client.
 
-use crate::chat_client::openai_api::chat_completions::{ChatCompletions, ChatCompletionsRequest};
+use crate::chat_client::openai_api::chat_completions::ChatCompletions;
 use eventsource_stream::{EventStream, Eventsource};
 use futures::stream::Stream;
 use reqwest::{
@@ -30,6 +30,7 @@ use reqwest::{
     Client, Method, Request, RequestBuilder, StatusCode,
 };
 use serde::Deserialize;
+use serde_json::value::Value;
 use std::{fmt::Display, str::FromStr, time::Duration};
 use url::{ParseError, Url};
 
@@ -109,10 +110,7 @@ impl OpenAiClient {
     }
 
     /// Request chat completion message.
-    pub async fn chat_completions(
-        &mut self,
-        body: ChatCompletionsRequest,
-    ) -> Result<ChatCompletions, Error> {
+    pub async fn chat_completions(&mut self, body: Value) -> Result<ChatCompletions, Error> {
         let response = self.build_request(body).send().await?;
 
         if response.status().is_success() {
@@ -139,7 +137,7 @@ impl OpenAiClient {
     /// Request chat completion stream.
     pub async fn chat_completions_stream(
         &mut self,
-        body: ChatCompletionsRequest,
+        body: Value,
     ) -> Result<EventStream<impl Stream<Item = Result<bytes::Bytes, reqwest::Error>>>, Error> {
         Ok(self
             .build_request(body)
@@ -150,7 +148,7 @@ impl OpenAiClient {
     }
 
     /// Build request.
-    fn build_request(&mut self, body: ChatCompletionsRequest) -> RequestBuilder {
+    fn build_request(&mut self, body: Value) -> RequestBuilder {
         RequestBuilder::from_parts(
             self.client.clone(),
             Request::new(Method::POST, self.endpoint.clone()),
