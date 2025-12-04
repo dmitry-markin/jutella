@@ -364,7 +364,7 @@ pub struct IntermediateImagePart {
     /// Type. Either `image_url` or `file`.
     #[query(".type")]
     ty: String,
-    /// Imahge URL or base64 encoded data.
+    /// Image URL or base64 encoded data.
     #[query(".image_url.url")]
     url: String,
 }

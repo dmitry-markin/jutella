@@ -26,6 +26,7 @@ use anyhow::{anyhow, Context as _};
 use clap::{Parser, ValueEnum};
 use dirs::home_dir;
 use jutella::Auth;
+use serde_json::Value;
 use std::{fs, path::PathBuf, time::Duration};
 
 const HOME_CONFIG_LOCATION: &str = ".config/jutella.toml";
@@ -149,6 +150,7 @@ struct ConfigFile {
     sanitize_links: Option<bool>,
     openrouter_pdf_engine: Option<String>,
     image_generation: Option<bool>,
+    extra_params_json: Option<String>,
 }
 
 pub struct Configuration {
@@ -167,6 +169,7 @@ pub struct Configuration {
     pub show_reasoning: bool,
     pub verbosity: Option<String>,
     pub sanitize_links: bool,
+    pub extra_params: Option<serde_json::map::Map<String, Value>>,
 }
 
 impl Configuration {
@@ -292,6 +295,18 @@ impl Configuration {
         let verbosity = verbosity.or(config.verbosity);
         let sanitize_links = config.sanitize_links.unwrap_or_default();
 
+        let extra_params = config
+            .extra_params_json
+            .map(|s| serde_json::from_str(&s))
+            .transpose()
+            .context("not a valid JSON in `extra_params_json`")?
+            .map(|json: Value| {
+                json.as_object()
+                    .cloned()
+                    .context("not a JSON map in `extra_params_json`")
+            })
+            .transpose()?;
+
         Ok(Self {
             api_url,
             api_options,
@@ -308,6 +323,7 @@ impl Configuration {
             show_reasoning,
             verbosity,
             sanitize_links,
+            extra_params,
         })
     }
 }

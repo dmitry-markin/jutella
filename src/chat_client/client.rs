@@ -143,6 +143,8 @@ pub struct ChatClientConfig {
     pub verbosity: Option<String>,
     /// Sanitize links, removing analytics GET parameters. Does nothing in streaming mode.
     pub sanitize_links: bool,
+    /// Extra parameters to pass in request body.
+    pub extra_params: Option<serde_json::map::Map<String, Value>>,
 }
 
 impl ChatClientConfig {
@@ -162,6 +164,7 @@ impl ChatClientConfig {
             max_history_tokens: None,
             verbosity: None,
             sanitize_links: false,
+            extra_params: None,
         }
     }
 }
@@ -218,6 +221,7 @@ pub struct ChatClient {
     context: Context,
     sanitize_links: bool,
     sanitize_re: regex::Regex,
+    extra_params: Option<serde_json::map::Map<String, Value>>,
 }
 
 impl ChatClient {
@@ -265,6 +269,7 @@ impl ChatClient {
             max_history_tokens,
             verbosity,
             sanitize_links,
+            extra_params,
         } = config;
 
         let client = OpenAiClient::new(OpenAiClientConfig {
@@ -295,6 +300,7 @@ impl ChatClient {
             context,
             sanitize_links,
             sanitize_re,
+            extra_params,
         })
     }
 
@@ -317,7 +323,8 @@ impl ChatClient {
                 &self.context,
                 request.clone(),
                 false,
-            ))
+                self.extra_params.clone(),
+            )?)
             .await?;
 
         let choice = completion.choices.pop().ok_or(Error::NoChoices)?;
@@ -370,7 +377,8 @@ impl ChatClient {
                 &self.context,
                 request.clone(),
                 true,
-            ))
+                self.extra_params.clone(),
+            )?)
             .await?;
 
         Ok(CompletionStream::new(self, stream, request))
@@ -403,8 +411,9 @@ impl ChatClient {
         context: &Context,
         request: Content,
         stream: bool,
-    ) -> ChatCompletionsRequest {
-        ChatCompletionsRequest {
+        extra_params: Option<serde_json::map::Map<String, Value>>,
+    ) -> Result<Value, Error> {
+        let mut json = serde_json::to_value(ChatCompletionsRequest {
             model,
             messages: context.with_request(request).map(Into::into).collect(),
             reasoning_effort: api_options.as_openai_reasoning_effort(),
@@ -418,7 +427,17 @@ impl ChatClient {
             plugins: api_options.as_openrouter_plugins(),
             modalities: api_options.as_openrouter_modalities(),
             ..Default::default()
+        })
+        .map_err(Error::BodySerializationError)?;
+
+        if let Some(extra_params) = extra_params {
+            let json_object = json
+                .as_object_mut()
+                .ok_or(Error::InternalError("chat completions body is not a JSON"))?;
+            json_object.extend(extra_params);
         }
+
+        Ok(json)
     }
 
     fn sanitize_links(&self, response: String) -> String {
