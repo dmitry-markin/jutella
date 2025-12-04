@@ -148,6 +148,7 @@ struct ConfigFile {
     verbosity: Option<String>,
     sanitize_links: Option<bool>,
     openrouter_pdf_engine: Option<String>,
+    image_generation: Option<bool>,
 }
 
 pub struct Configuration {
@@ -259,6 +260,8 @@ impl Configuration {
         let reasoning_effort = reasoning_effort.or(config.reasoning_effort);
         let reasoning_budget = reasoning_budget.or(config.reasoning_budget);
         let pdf_engine = config.openrouter_pdf_engine;
+        let image_generation = config.image_generation.unwrap_or_default();
+
         let api_options = match (api_type, reasoning_effort, reasoning_budget) {
             (ApiType::OpenAi, effort, None) => jutella::ApiOptions::OpenAi {
                 reasoning_effort: effort,
@@ -266,14 +269,17 @@ impl Configuration {
             (ApiType::OpenRouter, None, None) => jutella::ApiOptions::OpenRouter {
                 reasoning: None,
                 pdf_engine,
+                image_generation,
             },
             (ApiType::OpenRouter, Some(effort), None) => jutella::ApiOptions::OpenRouter {
                 reasoning: Some(jutella::ReasoningSettings::Effort(effort)),
                 pdf_engine,
+                image_generation,
             },
             (ApiType::OpenRouter, None, Some(budget)) => jutella::ApiOptions::OpenRouter {
                 reasoning: Some(jutella::ReasoningSettings::Budget(budget)),
                 pdf_engine,
+                image_generation,
             },
             _ => {
                 return Err(anyhow!(

@@ -63,3 +63,6 @@ max_history_tokens = 2500
 # Enable OpenRouter PDF engine. Typically one of `native`, `mistral-ocr`, `pdf-text`.
 # Will be ignored with `openai` API.
 #openrouter_pdf_engine = "native"
+
+# Enable image generation. Only supported with OpenRouter.
+#image_generation = false

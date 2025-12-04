@@ -116,7 +116,7 @@ where
                         if let Some(response) = this.state.finalize(State::WaitingForEndOfStream) {
                             this.client.extend_context(
                                 this.request.clone(),
-                                response,
+                                Content::Text(response),
                                 &Default::default(),
                             );
                         }
@@ -129,7 +129,7 @@ where
                     if let Some(response) = this.state.finalize(State::Terminated) {
                         this.client.extend_context(
                             this.request.clone(),
-                            response,
+                            Content::Text(response),
                             &Default::default(),
                         );
                     }
@@ -140,7 +140,7 @@ where
                     if let Some(response) = this.state.finalize(State::Terminated) {
                         this.client.extend_context(
                             this.request.clone(),
-                            response,
+                            Content::Text(response),
                             &Default::default(),
                         );
                     }
@@ -156,7 +156,7 @@ where
                     if let Some(response) = this.state.finalize(State::Terminated) {
                         this.client.extend_context(
                             this.request.clone(),
-                            response,
+                            Content::Text(response),
                             &Default::default(),
                         );
                     }
@@ -186,7 +186,7 @@ where
                         if let Some(response) = this.state.finalize(State::Terminated) {
                             this.client.extend_context(
                                 this.request.clone(),
-                                response,
+                                Content::Text(response),
                                 &Default::default(),
                             );
                         }
@@ -202,8 +202,11 @@ where
                         if let Some(response) = this.state.finalize(State::WaitingForDone) {
                             // This is the branch taken during normal operation.
                             // TODO: log warnings in all the other cases.
-                            this.client
-                                .extend_context(this.request.clone(), response, usage);
+                            this.client.extend_context(
+                                this.request.clone(),
+                                Content::Text(response),
+                                usage,
+                            );
                         }
                     }
                 },

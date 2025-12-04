@@ -257,6 +257,10 @@ pub struct ChatCompletionsRequest {
     /// OpenRouter plugins. Used to enable PDF engine.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plugins: Option<Vec<Value>>,
+
+    /// OpenRouter modalities. Used to enable image generation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modalities: Option<Value>,
 }
 
 /// Stream options.

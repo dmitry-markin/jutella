@@ -32,7 +32,7 @@ use iter_accumulate::IterAccumulate;
 pub struct Context {
     system_message: Option<String>,
     system_message_tokens: usize,
-    conversation: Vec<(Content, String, usize)>,
+    conversation: Vec<(Content, Content, usize)>,
     min_history_tokens: Option<usize>,
     max_history_tokens: Option<usize>,
 }
@@ -70,7 +70,7 @@ impl Context {
     }
 
     /// Extend the context with a new pair of request and response.
-    pub fn push(&mut self, request: Content, response: String, tokens: usize) {
+    pub fn push(&mut self, request: Content, response: Content, tokens: usize) {
         self.conversation.push((request, response, tokens));
         self.keep_recent();
     }
@@ -132,7 +132,7 @@ mod tests {
         let mut context = Context::default();
         context.push(
             Content::Text(String::from("req1")),
-            String::from("resp1"),
+            Content::Text(String::from("resp1")),
             2,
         );
 
@@ -142,7 +142,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![
                 UserMessage::new_from_str("req1").into(),
-                AssistantMessage::new(String::from("resp1")).into(),
+                AssistantMessage::new_from_str("resp1").into(),
                 UserMessage::new_from_str("req2").into(),
             ],
         );
@@ -168,7 +168,7 @@ mod tests {
         let mut context = Context::new(Some(String::from("system")), 1, None, None);
         context.push(
             Content::Text(String::from("req1")),
-            String::from("resp1"),
+            Content::Text(String::from("resp1")),
             2,
         );
 
@@ -179,7 +179,7 @@ mod tests {
             vec![
                 SystemMessage::new(String::from("system")).into(),
                 UserMessage::new_from_str("req1").into(),
-                AssistantMessage::new(String::from("resp1")).into(),
+                AssistantMessage::new_from_str("resp1").into(),
                 UserMessage::new_from_str("req2").into(),
             ]
         );
@@ -195,15 +195,27 @@ mod tests {
         assert!(context.conversation.is_empty());
 
         // 15 tokens
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 1);
 
         // 25 tokens
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 2);
 
         // 25 tokens again: one transaction was discarded
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 2);
     }
 
@@ -216,15 +228,27 @@ mod tests {
         assert!(context.conversation.is_empty());
 
         // 10 tokens
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 1);
 
         // 20 tokens
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 2);
 
         // 20 tokens again: one transaction was discarded
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 2);
     }
 
@@ -238,15 +262,27 @@ mod tests {
         assert!(context.conversation.is_empty());
 
         // 15 tokens
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 1);
 
         // 25 tokens
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 2);
 
         // 25 tokens again: one transaction was discarded
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 2);
     }
 
@@ -259,19 +295,35 @@ mod tests {
         assert!(context.conversation.is_empty());
 
         // 10 tokens
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 1);
 
         // 20 tokens
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 2);
 
         // 30 tokens
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 3);
 
         // 30 tokens again: one transaction was discarded
-        context.push(Content::Text(request.clone()), response.clone(), 10);
+        context.push(
+            Content::Text(request.clone()),
+            Content::Text(response.clone()),
+            10,
+        );
         assert_eq!(context.conversation.len(), 3);
     }
 }

@@ -56,4 +56,7 @@ pub enum Error {
     /// Reasoning delta after content.
     #[error("Unexpected stream event: {0}")]
     UnexpectedStreamEvent(&'static str),
+    /// Content cant be represented as text.
+    #[error("Content is not a text")]
+    NonTextContent,
 }

@@ -150,12 +150,49 @@ impl Chat {
             self.show_reasoning
                 .then(|| completion.reasoning.map(|r| print_reasoning(r.trim())));
 
-            print_response(&completion.response);
+            match completion.response {
+                Content::Text(response) => {
+                    print_response(&response);
 
-            if self.xclip {
-                copy_to_clipboard(completion.response)
-                    .inspect_err(|e| print_error(e))
-                    .unwrap_or_default();
+                    if self.xclip {
+                        copy_to_clipboard(response)
+                            .inspect_err(|e| print_error(e))
+                            .unwrap_or_default();
+                    }
+                }
+                Content::ContentParts(parts) => {
+                    let mut needs_leading_newline = true;
+                    let mut needs_trailing_newline = false;
+
+                    for part in parts {
+                        match part {
+                            ContentPart::Text(text) => {
+                                print_response(&text);
+                                needs_leading_newline = false;
+                                needs_trailing_newline = false;
+                            }
+                            ContentPart::Image(ImagePart { url, detail: _ }) => {
+                                if needs_leading_newline {
+                                    println!();
+                                    needs_leading_newline = false;
+                                }
+
+                                if let Err(e) = save_and_show_image(url) {
+                                    print_error(e)
+                                }
+
+                                needs_trailing_newline = true;
+                            }
+                            ContentPart::File(_) => {
+                                print_error("files in the response not supported, ignoring");
+                            }
+                        }
+                    }
+
+                    if needs_trailing_newline {
+                        println!();
+                    }
+                }
             }
 
             if self.show_token_usage {
@@ -364,4 +401,46 @@ fn attach_file(path: &str) -> anyhow::Result<ContentPart> {
             detail: None,
         }))
     }
+}
+
+fn extract_mime_type_and_base64(encoded_data: &str) -> Option<(&str, &str)> {
+    let tail = encoded_data.strip_prefix("data:")?;
+    let index = tail.find(';')?;
+    let (mime_type, tail) = tail.split_at(index);
+    let b64_data = tail.strip_prefix(";base64,")?;
+
+    Some((mime_type, b64_data))
+}
+
+fn save_and_show_image(encoded_data: String) -> anyhow::Result<()> {
+    let Some((mime_type, base64_data)) = extract_mime_type_and_base64(&encoded_data) else {
+        return Err(anyhow!("invalid image encoded data"));
+    };
+
+    let extension = match mime_type {
+        "image/jpeg" => ".jpg",
+        "image/png" => ".png",
+        "image/gif" => ".gif",
+        "image/webp" => ".webp",
+        mime_type => return Err(anyhow!("unsupported image MIME-type `{}`", mime_type)),
+    };
+
+    let binary = BASE64_STANDARD
+        .decode(base64_data)
+        .context("invalid base64 data")?;
+
+    let mut file = tempfile::Builder::new()
+        .prefix("jutella-")
+        .rand_bytes(5)
+        .suffix(extension)
+        .tempfile()
+        .context("failed to create temporary file for image")?;
+
+    file.write_all(&binary)?;
+    let (_, path) = file.keep().context("failed to keep temporary file")?;
+
+    let message = format!("File saved: {}", path.display());
+    println!("{}", message.bold().blue());
+
+    Ok(())
 }
