@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2025-12-06
+
+This release adds support for PDF & image attachments and image generation. Image generation is only supported with OpenRouter API.
+
+### Added
+
+- Allow opening saved files with `xdg-open` ([#29](https://github.com/dmitry-markin/jutella/pull/29))
+- Allow passing custom JSON params in request ([#28](https://github.com/dmitry-markin/jutella/pull/28))
+- Image generation and editing support (OpenRouter) ([#27](https://github.com/dmitry-markin/jutella/pull/27))
+- Image & file attachments support ([#26](https://github.com/dmitry-markin/jutella/pull/26))
+- Sanitize links ([#24](https://github.com/dmitry-markin/jutella/pull/24))
+
+### Changed
+
+- Use API provided token usage info for context size calculation ([#25](https://github.com/dmitry-markin/jutella/pull/25))
+
 ## [0.7.0] - 2025-10-29
 
 This release allows a tokenizer to be shared across chat instances. This reduces a memory footprint by approximately 50 MB per chat instance. Additionally, the API is extended to support response streaming.
