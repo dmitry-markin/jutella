@@ -2,7 +2,14 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/dmitry-markin/jutella/blob/master/LICENSE) [![crates.io](https://img.shields.io/crates/v/jutella.svg)](https://crates.io/crates/jutella) [![docs.rs](https://img.shields.io/docsrs/jutella.svg)](https://docs.rs/jutella/latest/jutella/)
 
-Chatbot API client library and CLI interface. Supports OpenAI chat completions API, including OpenAI, Azure, and OpenRouter flavors.
+Chatbot API client library and CLI interface. Supports OpenAI (including Azure auth flavor) and OpenRouter chat completions API.
+
+
+## Features
+
+1. Rolling context window with min/max token limits.
+2. Image & PDF file attachments.
+3. Image generation (only with OpenRouter).
 
 
 ## Command line interface
