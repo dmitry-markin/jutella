@@ -50,6 +50,7 @@ async fn main() -> anyhow::Result<()> {
         system_message,
         stream,
         xclip,
+        xdg_open,
         show_token_usage,
         show_reasoning,
         min_history_tokens,
@@ -79,6 +80,7 @@ async fn main() -> anyhow::Result<()> {
         client,
         show_reasoning,
         xclip,
+        xdg_open,
         show_token_usage,
         stream,
         pending_attachments: Vec::new(),
@@ -99,6 +101,7 @@ struct Chat {
     client: ChatClient,
     show_reasoning: bool,
     xclip: bool,
+    xdg_open: bool,
     show_token_usage: bool,
     stream: bool,
     pending_attachments: Vec<ContentPart>,
@@ -179,7 +182,7 @@ impl Chat {
                                     needs_leading_newline = false;
                                 }
 
-                                if let Err(e) = save_and_show_image(url) {
+                                if let Err(e) = save_and_show_image(url, self.xdg_open) {
                                     print_error(e)
                                 }
 
@@ -357,6 +360,31 @@ fn copy_to_clipboard(string: String) -> anyhow::Result<()> {
         })
 }
 
+fn xdg_open(path: String) -> anyhow::Result<()> {
+    let mut xdg_open = Command::new("xdg-open")
+        .arg(path)
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("Failed to spawn `xdg-open`")?;
+
+    xdg_open
+        .wait()
+        .context("Failed to wait for `xdg-open`")?
+        .success()
+        .then_some(())
+        .ok_or(())
+        .or_else(|()| {
+            let mut error = String::new();
+            xdg_open
+                .stderr
+                .take()
+                .context(anyhow!("Failed to open `xdg-open` stderr"))?
+                .read_to_string(&mut error)?;
+
+            Err(anyhow!("`xdg-open` returned an error: {}", error.trim()))
+        })
+}
+
 // Count up to two trailing newlines.
 fn count_trailing_newlines(mut string: String) -> u8 {
     if string.pop() == Some('\n') {
@@ -414,7 +442,7 @@ fn extract_mime_type_and_base64(encoded_data: &str) -> Option<(&str, &str)> {
     Some((mime_type, b64_data))
 }
 
-fn save_and_show_image(encoded_data: String) -> anyhow::Result<()> {
+fn save_and_show_image(encoded_data: String, open: bool) -> anyhow::Result<()> {
     let Some((mime_type, base64_data)) = extract_mime_type_and_base64(&encoded_data) else {
         return Err(anyhow!("invalid image encoded data"));
     };
@@ -443,6 +471,14 @@ fn save_and_show_image(encoded_data: String) -> anyhow::Result<()> {
 
     let message = format!("File saved: {}", path.display());
     println!("{}", message.bold().blue());
+
+    if open {
+        xdg_open(
+            path.into_os_string()
+                .into_string()
+                .map_err(|_| anyhow!("saved file path is not a utf-8 string"))?,
+        )?;
+    }
 
     Ok(())
 }

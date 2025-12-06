@@ -86,6 +86,10 @@ pub struct Args {
     #[arg(short, long)]
     xclip: bool,
 
+    /// Use `xdg-open` to open saved files.
+    #[arg(long)]
+    xdg_open: bool,
+
     /// Show number of tokens used while generating the response.
     /// Format: input tokens (cached input tokens) / output tokens (reasoning tokens)
     #[arg(short = 'g', long)]
@@ -142,6 +146,7 @@ struct ConfigFile {
     min_history_tokens: Option<usize>,
     max_history_tokens: Option<usize>,
     xclip: Option<bool>,
+    xdg_open: Option<bool>,
     show_token_usage: Option<bool>,
     show_reasoning: Option<bool>,
     reasoning_effort: Option<String>,
@@ -165,6 +170,7 @@ pub struct Configuration {
     pub min_history_tokens: Option<usize>,
     pub max_history_tokens: Option<usize>,
     pub xclip: bool,
+    pub xdg_open: bool,
     pub show_token_usage: bool,
     pub show_reasoning: bool,
     pub verbosity: Option<String>,
@@ -185,6 +191,7 @@ impl Configuration {
             max_history_tokens,
             config,
             xclip,
+            xdg_open,
             show_token_usage,
             show_reasoning,
             reasoning_effort,
@@ -257,6 +264,7 @@ impl Configuration {
 
         let stream = stream || config.stream.unwrap_or_default();
         let xclip = xclip || config.xclip.unwrap_or_default();
+        let xdg_open = xdg_open || config.xdg_open.unwrap_or_default();
         let show_token_usage = show_token_usage || config.show_token_usage.unwrap_or_default();
         let show_reasoning = show_reasoning || config.show_reasoning.unwrap_or_default();
 
@@ -319,6 +327,7 @@ impl Configuration {
             min_history_tokens,
             max_history_tokens,
             xclip,
+            xdg_open,
             show_token_usage,
             show_reasoning,
             verbosity,
