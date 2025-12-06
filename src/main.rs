@@ -150,10 +150,8 @@ impl Chat {
             .await
             .inspect_err(|e| print_error(e))
         {
-            // `trim()` is needed for reasoning, because OpenRouter returns three empty lines in
-            // the end.
             self.show_reasoning
-                .then(|| completion.reasoning.map(|r| print_reasoning(r.trim())));
+                .then(|| completion.reasoning.map(|r| print_reasoning(&r)));
 
             match completion.response {
                 Content::Text(response) => {
@@ -167,14 +165,12 @@ impl Chat {
                 }
                 Content::ContentParts(parts) => {
                     let mut needs_leading_newline = true;
-                    let mut needs_trailing_newline = false;
 
                     for part in parts {
                         match part {
                             ContentPart::Text(text) => {
                                 print_response(&text);
-                                needs_leading_newline = false;
-                                needs_trailing_newline = false;
+                                needs_leading_newline = true;
                             }
                             ContentPart::Image(ImagePart { url, detail: _ }) => {
                                 if needs_leading_newline {
@@ -185,20 +181,16 @@ impl Chat {
                                 if let Err(e) = save_and_show_image(url, self.xdg_open) {
                                     print_error(e)
                                 }
-
-                                needs_trailing_newline = true;
                             }
                             ContentPart::File(_) => {
                                 print_error("files in the response not supported, ignoring");
                             }
                         }
                     }
-
-                    if needs_trailing_newline {
-                        println!();
-                    }
                 }
             }
+
+            println!();
 
             if self.show_token_usage {
                 print_token_usage(completion.token_usage);
@@ -304,11 +296,11 @@ fn print_prompt() -> Result<(), io::Error> {
 }
 
 fn print_reasoning(reasoning: &str) {
-    println!("\n{} {reasoning}", "Reasoning:".bold().blue());
+    println!("\n{} {}", "Reasoning:".bold().blue(), reasoning.trim());
 }
 
 fn print_response(response: &str) {
-    println!("\n{} {response}\n", "Assistant:".bold().green());
+    println!("\n{} {}", "Assistant:".bold().green(), response.trim());
 }
 
 fn print_token_usage(usage: TokenUsage) {
