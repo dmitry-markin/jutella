@@ -9,7 +9,7 @@ Chatbot API client library and CLI interface. Supports OpenAI (including Azure a
 
 1. Rolling context window with min/max token limits.
 2. Image & PDF file attachments.
-3. Image generation (only with OpenRouter).
+3. Image generation and editing (only with OpenRouter).
 
 
 ## Command line interface
