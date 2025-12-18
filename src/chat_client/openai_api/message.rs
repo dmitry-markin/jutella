@@ -314,7 +314,12 @@ impl Serialize for ContentPart {
         S: Serializer,
     {
         match self {
-            ContentPart::Text(s) => serializer.serialize_str(s),
+            ContentPart::Text(text) => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("type", "text")?;
+                map.serialize_entry("text", text)?;
+                map.end()
+            }
             ContentPart::Image(image) => {
                 let mut map = serializer.serialize_map(Some(2))?;
                 map.serialize_entry("type", "image_url")?;
