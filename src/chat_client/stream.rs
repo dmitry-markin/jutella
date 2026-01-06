@@ -274,7 +274,8 @@ fn parse_stream_chunk(event: &str) -> Result<Option<Delta>, Error> {
         // Just ignore finish reason message.
         Ok(None)
     } else {
-        Err(Error::NoContent)
+        // llama-cpp returns first delta with `"content": null`.
+        Ok(None)
     }
 }
 
