@@ -329,27 +329,27 @@ impl ChatClient {
 
         let choice = completion.choices.pop().ok_or(Error::NoChoices)?;
         let assistant_message = ResponseAssistantMessage::try_from(choice.message)?;
-        let response = assistant_message
+        let text = assistant_message
             .content
-            .map(|response| self.sanitize_links(response))
-            .ok_or(
-                assistant_message
-                    .refusal
-                    .map_or(Error::NoContent, Error::Refusal),
-            )?;
+            .map(|text| self.sanitize_links(text))
+            .map(|text| (!text.is_empty()).then_some(text))
+            .flatten();
 
         // TODO: we likely need to report tokens used in case of errors as well.
 
         let response = if let Some(images) = assistant_message.images {
             Content::ContentParts(
-                (!response.is_empty())
-                    .then_some(ContentPart::Text(response))
+                text.map(ContentPart::Text)
                     .into_iter()
                     .chain(images.into_iter().map(ContentPart::Image))
                     .collect(),
             )
         } else {
-            Content::Text(response)
+            Content::Text(text.ok_or(
+                assistant_message
+                    .refusal
+                    .map_or(Error::NoContent, Error::Refusal),
+            )?)
         };
 
         let token_usage = completion.usage.into();
