@@ -104,7 +104,7 @@ impl ApiOptions {
         match self {
             ApiOptions::OpenRouter {
                 image_generation, ..
-            } => image_generation.then_some(json!(["image", "text"])),
+            } => image_generation.then_some(json!(["image"])),
             _ => None,
         }
     }
@@ -345,11 +345,13 @@ impl ChatClient {
                     .collect(),
             )
         } else {
-            Content::Text(text.ok_or(
-                assistant_message
-                    .refusal
-                    .map_or(Error::NoContent, Error::Refusal),
-            )?)
+            Content::Text(
+                text.ok_or(
+                    assistant_message
+                        .refusal
+                        .map_or(Error::NoContent, Error::Refusal),
+                )?,
+            )
         };
 
         let token_usage = completion.usage.into();
