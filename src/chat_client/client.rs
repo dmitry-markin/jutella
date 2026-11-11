@@ -332,8 +332,7 @@ impl ChatClient {
         let text = assistant_message
             .content
             .map(|text| self.sanitize_links(text))
-            .map(|text| (!text.is_empty()).then_some(text))
-            .flatten();
+            .and_then(|text| (!text.is_empty()).then_some(text));
 
         // TODO: we likely need to report tokens used in case of errors as well.
 
@@ -345,11 +344,13 @@ impl ChatClient {
                     .collect(),
             )
         } else {
-            Content::Text(text.ok_or(
-                assistant_message
-                    .refusal
-                    .map_or(Error::NoContent, Error::Refusal),
-            )?)
+            Content::Text(
+                text.ok_or(
+                    assistant_message
+                        .refusal
+                        .map_or(Error::NoContent, Error::Refusal),
+                )?,
+            )
         };
 
         let token_usage = completion.usage.into();
