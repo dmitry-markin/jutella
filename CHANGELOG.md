@@ -5,7 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.1] - 2025-12-18
+## 0.9.0 - 2026-11-12
+
+This release includes security updates and bug fixes. It also adds support for the llama.cpp chat completions endpoint and fixes compatibility with text-and-image models on OpenRouter. This release upgrades `reqwest` to v0.13; callers supplying a custom `reqwest::Client` must update accordingly.
+
+### Added
+
+- Support the llama.cpp chat completions endpoint ([#33](https://github.com/dmitry-markin/jutella/pull/33))
+
+### Fixed
+
+- Fix image generation via OpenRouter text-and-image models ([#34](https://github.com/dmitry-markin/jutella/pull/34))
+
+### Security
+
+- Update dependencies to resolve security advisories ([#35](https://github.com/dmitry-markin/jutella/pull/35))
+
+## 0.8.1 - 2025-12-18
 
 This release adds image editing support with OpenRouter. You should send editing instructions after attaching all source images.
 
@@ -13,7 +29,7 @@ This release adds image editing support with OpenRouter. You should send editing
 
 - Image editing support ([#31](https://github.com/dmitry-markin/jutella/pull/31))
 
-## [0.8.0] - 2025-12-06
+## 0.8.0 - 2025-12-06
 
 This release adds support for PDF & image attachments and image generation. Image generation is only supported with OpenRouter API.
 
@@ -29,7 +45,7 @@ This release adds support for PDF & image attachments and image generation. Imag
 
 - Use API provided token usage info for context size calculation ([#25](https://github.com/dmitry-markin/jutella/pull/25))
 
-## [0.7.0] - 2025-10-29
+## 0.7.0 - 2025-10-29
 
 This release allows a tokenizer to be shared across chat instances. This reduces a memory footprint by approximately 50 MB per chat instance. Additionally, the API is extended to support response streaming.
 
@@ -43,7 +59,7 @@ This release allows a tokenizer to be shared across chat instances. This reduces
 - Allow sharing tokenizer across chat instances ([#21](https://github.com/dmitry-markin/jutella/pull/21))
 - Allow reusing generic `reqwest::Client` & expose HTTP timeout setting ([#19](https://github.com/dmitry-markin/jutella/pull/19))
 
-## [0.6.0] - 2025-09-09
+## 0.6.0 - 2025-09-09
 
 This release adds support for getting reasoning summaries and setting `reasoning_budget` when using OpenRouter API.
 
@@ -52,7 +68,7 @@ This release adds support for getting reasoning summaries and setting `reasoning
 - Option to show reasoning summary (only OpenRouter API) ([#17](https://github.com/dmitry-markin/jutella/pull/17))
 - Support `reasoning_budget` with OpenRouter API ([#16](https://github.com/dmitry-markin/jutella/pull/16))
 
-## [0.5.0] - 2025-09-06
+## 0.5.0 - 2025-09-06
 
 This relase adds support for [OpenRouter](https://openrouter.ai/) API, exposes options for `reasonning_effort` and response `verbosity`, extends token usage reporting, and adds token usage display to the CLI client.
 
@@ -71,7 +87,7 @@ This relase adds support for [OpenRouter](https://openrouter.ai/) API, exposes o
 
 - Fix error on null `system_fingerprint` with `gpt-4.5-preview` ([commit](https://github.com/dmitry-markin/jutella/commit/44f241c1c108effe79340bcab5b4f2ba99834662))
 
-## [0.4.0] - 2024-11-30
+## 0.4.0 - 2024-11-30
 
 This release adds `min_history_tokens` context window rolling strategy. It can be handy to keep the last big response in the context. Additionally, the API now provides token usage info.
 
@@ -85,7 +101,7 @@ This release adds `min_history_tokens` context window rolling strategy. It can b
 - Fix loading config file passed as CLI option ([commit](https://github.com/dmitry-markin/jutella/commit/be668dcfb3f082e54e437088d64234af7e5f650e))
 - Remove impossible `Error::NoTokenizer` and update docs ([commit](https://github.com/dmitry-markin/jutella/commit/4aef26a43024f0390775da07b26c4ae7a5c378aa))
 
-## [0.3.1] - 2024-09-24
+## 0.3.1 - 2024-09-24
 
 This is a bugfix release fixing compilation of the library with `default-features = false`.
 
@@ -93,7 +109,7 @@ This is a bugfix release fixing compilation of the library with `default-feature
 
 - Fix compilation of library with `default-features = false` ([commit](https://github.com/dmitry-markin/jutella/commit/3e9493f5ec67fea0cbc35467aa0789d3d5914add))
 
-## [0.3.0] - 2024-09-24
+## 0.3.0 - 2024-09-24
 
 This release introduces several new features and improvements. Key updates are:
 
@@ -115,7 +131,7 @@ This release introduces several new features and improvements. Key updates are:
 - cli: Print `xclip` stderr on invocation failure ([commit](https://github.com/dmitry-markin/jutella/commit/06f5431a2f9fca4ca0babab24a37b9644f3e82c4))
 - Make bin dependencies optional for lib ([commit](https://github.com/dmitry-markin/jutella/commit/ff76ba787df8739930cab43759c8903c48b326da))
 
-## [0.2.0] - 2024-09-19
+## 0.2.0 - 2024-09-19
 
 The project was renamed to `jutella`.
 
@@ -125,7 +141,7 @@ The project was renamed to `jutella`.
 - Improve docs
 - Rename `unspoken` -> `jutella`
 
-## [0.1.1] - 2024-09-18
+## 0.1.1 - 2024-09-18
 
 Improved documentation and README.
 
@@ -135,7 +151,7 @@ Improved documentation and README.
 - Improve help
 - Improve docs
 
-## [0.1.0] - 2024-09-17
+## 0.1.0 - 2024-09-17
 
 Initial release.
 
